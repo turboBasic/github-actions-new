@@ -27,4 +27,27 @@
 #                       makes the gate per-job, since a skipped job reports success and an unreasoned
 #                       skip is a required check that passes without reading anything.
 #
-# No capability exists yet. Each row arrives in the same change as the capability it describes.
+# Each row arrives in the same change as the capability it describes.
+
+[python-ci]
+kind = "workflow"
+published = true
+check_name = ["python-ci"]
+inputs = [
+  "hook-stage",
+  "lint-changed-only",
+  "lint-task",
+  "run-lint",
+  "run-tests",
+  "run-typecheck",
+  "test-task",
+  "timeout-minutes",
+  "typecheck-task",
+]
+permissions = { contents = "read" }
+tool_prerequisites = [
+  "uv — the lockfile check invokes it directly",
+  "the tasks named by lint-task, typecheck-task and test-task",
+  "prek — only while lint-changed-only is on",
+]
+skips_under = []

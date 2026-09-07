@@ -3,12 +3,15 @@ from itertools import pairwise
 
 from capabilities import (
     REPO,
+    WORKFLOW_DIR,
     Doc,
     action_paths,
+    declared_inputs,
     fixture,
     is_capability,
     jobs,
     load,
+    workflow_docs,
     workflow_paths,
 )
 
@@ -24,6 +27,12 @@ PERMISSION = re.compile(r"^\s*[a-z][a-z-]*:\s*(?:read|write|none)\s*(?:#(?P<reas
 
 TABLE_DELIMITER = re.compile(r"^\|[\s:|-]+\|$")
 NAMES_A_DEFAULT = re.compile(r"default", re.IGNORECASE)
+
+GOVERNS_A_CACHE = re.compile(r"cache", re.IGNORECASE)
+
+# The steps of `python-ci` that judge the tree. Named by id rather than by the shape of their `run:`
+# line, so the gate holds whatever the lines become.
+STAGES = ("lint", "lint-changed", "typecheck", "tests")
 
 
 def skipping_jobs(doc: Doc) -> set[str]:
@@ -74,6 +83,46 @@ def test_every_permission_carries_its_reason_beside_it() -> None:
         + "; ".join(unexplained)
         + ". A shortfall fails the run before any job exists, so the block is the only place a "
         "consumer can read what it is for"
+    )
+
+
+def steps_of(name: str, job_id: str) -> list[Doc]:
+    return list(jobs(load(WORKFLOW_DIR / f"{name}.yml"))[job_id]["steps"])
+
+
+def test_no_capability_takes_an_input_governing_the_cache() -> None:
+    # Hook environments are cached unconditionally. An input that silently did nothing unless a
+    # second one was also set was worse than no input at all, and removing one is a break.
+    for name, doc in workflow_docs().items():
+        if not is_capability(doc):
+            continue
+        governing = sorted(
+            input_ for input_ in declared_inputs(doc) if GOVERNS_A_CACHE.search(input_)
+        )
+        assert governing == [], (
+            f"{name}: declares {governing}, but caching is not a call site's choice"
+        )
+
+
+def test_the_lockfile_check_precedes_every_stage_of_python_ci() -> None:
+    ids = [str(step.get("id", "")) for step in steps_of("python-ci", "python-ci")]
+    missing = [step_id for step_id in ("lockfile", *STAGES) if step_id not in ids]
+    assert missing == [], f"python-ci names no step {missing}, so this gate places nothing"
+    assert ids.index("lockfile") < min(ids.index(stage) for stage in STAGES), (
+        "python-ci runs a stage before installing from the lockfile. A lockfile disagreeing with "
+        "its manifest makes every stage a verdict about a tree the maintainer does not have"
+    )
+
+
+def test_the_changed_files_lint_is_gated_on_the_lint_stage_switch() -> None:
+    condition = next(
+        str(step.get("if", ""))
+        for step in steps_of("python-ci", "python-ci")
+        if step.get("id") == "lint-changed"
+    )
+    assert "inputs.run-lint" in condition, (
+        f"python-ci lints the changed set under `if: {condition}`, which does not consult "
+        "run-lint. An input named for a stage governs that stage entirely or it is misnamed"
     )
 
 

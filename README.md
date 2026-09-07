@@ -29,9 +29,44 @@ Two things a call site cannot show, and which apply to every capability below:
   annotation, and no condition able to skip past it. That is why each capability's demand is part of
   what it publishes rather than something a first run teaches you.
 
+Nothing is released yet, so the ref every call site below pins does not resolve. Versioning says what
+will be there to pin.
+
 ### `python-ci`
 
-Not shipped yet.
+One check over a **Python project**: its own lint, typecheck and test tasks, run by its own task
+runner, after installing from its own lockfile.
+
+```yaml
+jobs:
+  ci:
+    permissions:
+      contents: read
+    uses: turboBasic/github-actions-new/.github/workflows/python-ci.yml@v0.1
+```
+
+Required context: `ci / python-ci` — your own job id, then the called job's name.
+
+Reach for it when the repository has a `pyproject.toml` and a current `uv.lock`. A repository without
+a lockfile is out of scope rather than badly served: the lockfile check is not a stage that can be
+switched off, because a verdict from a tree whose lockfile disagrees with its manifest is a verdict
+about neither. The three stage switches are for a Python repository genuinely missing a stage, not a
+route to using this without Python.
+
+It needs, from `mise.toml` in the calling repository: the tasks it is asked to run, `uv`, and `prek`
+if the changed-files lint is on. Those stay yours to pin — that is the only reason a local verdict and
+this one agree — and a missing one fails the run naming the tool and where to declare it, rather than
+with `command not found`.
+
+Two things worth knowing before setting an input, and prose is the only place either fits:
+
+- **The changed-files lint lets a pull request pass while the tree is broken.** It reads the pull
+  request's own diff, so a finding in a file the pull request did not touch is never looked for.
+  `prek-advisory` is what compensates — it lints the whole tree on the same pull request and reports
+  in a comment rather than a check.
+- **A repository holding its slow hooks back for a later stage has to name that stage**, or the
+  changed-files lint fires the default stage and those hooks silently stop running on pull requests.
+  Pass `prek-advisory` the same stage.
 
 ### `conventional-commits`
 
