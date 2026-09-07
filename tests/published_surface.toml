@@ -51,3 +51,18 @@ tool_prerequisites = [
   "prek — only while lint-changed-only is on",
 ]
 skips_under = []
+
+[conventional-commits]
+kind = "workflow"
+published = true
+# Two jobs, so two contexts a consumer requires separately — and switching either check off means
+# retiring its context in the same change, or the ruleset keeps naming a gate that no longer reports.
+check_name = ["commit-messages", "pr-title"]
+inputs = ["check-commits", "check-title", "timeout-minutes", "types"]
+permissions = { contents = "read", pull-requests = "read" }
+tool_prerequisites = []
+
+[[conventional-commits.skips_under]]
+jobs = ["pr-title", "commit-messages"]
+event = "any event but pull_request"
+reason = "there is no title and no range to judge; a consumer must not require these contexts for another event"

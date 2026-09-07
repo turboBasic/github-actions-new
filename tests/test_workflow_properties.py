@@ -11,6 +11,7 @@ from capabilities import (
     is_capability,
     jobs,
     load,
+    triggers,
     workflow_docs,
     workflow_paths,
 )
@@ -124,6 +125,27 @@ def test_the_changed_files_lint_is_gated_on_the_lint_stage_switch() -> None:
         f"python-ci lints the changed set under `if: {condition}`, which does not consult "
         "run-lint. An input named for a stage governs that stage entirely or it is misnamed"
     )
+
+
+def test_no_workflow_anywhere_triggers_on_pull_request_target() -> None:
+    # It runs with this repository's own token while the pull request's text is a fork's to choose,
+    # so a trigger added here hands that token whatever the fork wrote.
+    offending = [
+        str(path.stem) for path in workflow_paths() if "pull_request_target" in triggers(load(path))
+    ]
+    assert offending == [], f"{offending} trigger on pull_request_target"
+
+
+def test_both_grammar_jobs_pin_the_event_they_can_judge() -> None:
+    # Pinning the event is also what puts `pull_request_target` structurally out of reach: neither job
+    # runs under any event but the one it reads a title and a range from.
+    doc = load(WORKFLOW_DIR / "conventional-commits.yml")
+    for job_id, job in jobs(doc).items():
+        condition = str(job.get("if", ""))
+        assert "github.event_name == 'pull_request'" in condition, (
+            f"conventional-commits job {job_id} runs under `if: {condition}`, which does not pin the "
+            "event to pull_request. There is no title and no range to judge under any other"
+        )
 
 
 def table_headers(text: str) -> list[list[str]]:

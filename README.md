@@ -70,7 +70,47 @@ Two things worth knowing before setting an input, and prose is the only place ei
 
 ### `conventional-commits`
 
-Not shipped yet.
+One grammar over both the pull request title and every commit message in the range, judged by the same
+tool the local commit hook uses, against one list of types — so the two checks cannot reach different
+verdicts about the same word. It provisions its own tooling, so a repository with no task-runner
+configuration at all can call it.
+
+```yaml
+name: commits
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  commits:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: turboBasic/github-actions-new/.github/workflows/conventional-commits.yml@v0.1
+```
+
+Required contexts: `commits / pr-title` and `commits / commit-messages` — two jobs, so two checks you
+require, switch off and retire independently.
+
+Three things that call site is doing on purpose:
+
+- **The activity types are spelled out, `edited` among them.** GitHub's default set for
+  `pull_request` omits it, and a corrected title is an edit rather than a push — leave it out and
+  fixing the title leaves the old red verdict standing with nothing to re-run it.
+- **The event is `pull_request`, never `pull_request_target`.** That one runs with your repository's
+  own token while the title and the commit messages are whatever a fork wrote. Both jobs pin the event
+  and skip under every other, so `pull_request_target` would reach nothing here anyway — and a
+  required context that never reports blocks every pull request.
+- **The type list is never read from your own commit-tool configuration.** Reading it from two places
+  is exactly what would let the title check and the commit check disagree, so pass `types` to change
+  it. A malformed list — comma-separated, quoted, anything but bare words one per line — fails the run
+  naming what it read, rather than compiling into a grammar that matches nothing.
+
+**Switching a check off means retiring its context in the same change.** `check-title: false` skips
+the `pr-title` job, and a skipped job reports success — so a ruleset still requiring
+`commits / pr-title` afterwards names a gate that no longer reports, and blocks every pull request in
+the repository until someone edits the ruleset by hand.
 
 ### `pr-description`
 
