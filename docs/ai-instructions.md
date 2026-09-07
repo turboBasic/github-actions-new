@@ -99,6 +99,22 @@ same linters.
 
 ## Code
 
+### Capabilities
+
+The workflows and actions a consumer calls. Each rule below was held against the invariants layer's
+admission bar and is a convention rather than a principle: a reviewer catches the breach and a revert
+restores the world.
+
+- **A failure names what to change.** What was read, what it was compared against, and what a
+  maintainer should do about it. An exit code on its own is not a result.
+- **A tool the consumer's configuration must pin is checked before it is invoked**, and the failure
+  names the tool, the capability that needs it, and where the consumer declares it. `command not found`
+  is not a contract.
+- **A tool the consumer invokes stays the consumer's to pin.** A capability never pins a version the
+  consumer does not control — that agreement is the only reason a local verdict and a CI verdict match.
+- **An input named for a stage governs that stage entirely.** If it leaves some part of the stage
+  running, it is misnamed.
+
 ### Python
 
 Python 3.14. The only Python here supports the actions and their tests.

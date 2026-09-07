@@ -37,7 +37,9 @@ run = [
   "uv run ruff check .",
   "uv run yamllint --strict .",
   "actionlint",
-  "zizmor --pedantic .github/workflows",
+  # `actions/` is held open by a `.gitkeep` until the first action lands: zizmor rejects a path
+  # that does not exist rather than skipping it, so the tree has to be there before the task names it.
+  "zizmor --pedantic .github/workflows actions",
   "markdownlint-cli2 \"**/*.md\"",
   "cspell lint --no-progress .",
   "uv run check-jsonschema --builtin-schema vendor.github-issue-forms .github/ISSUE_TEMPLATE/[0-9]-*.yml",

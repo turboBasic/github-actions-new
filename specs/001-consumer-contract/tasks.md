@@ -36,10 +36,10 @@ numeric order.
 **Purpose**: Make the tree able to hold an `actions/` tree and a capability, and clear the one debt the
 earlier phases left.
 
-- [ ] T001 Write the four conventions the constitution pass rejected as invariants into `docs/ai-instructions.md`: a failure names what to change; tool prerequisites are pre-flighted; consumer tool versions stay the consumer's; an input named for a stage governs that stage. Each is a convention because a reviewer catches it and a revert restores the world
-- [ ] T002 Add `actions/` to the linted trees: extend the `zizmor` line in `[tasks.lint]` in `mise.toml` to cover `actions/` as well as `.github/workflows`, since `actionlint` does not look outside `.github/workflows`
-- [ ] T003 [P] Add `actions` to `[tool.pyright].include` and `[tool.ruff].src` in `pyproject.toml`, so the decision unit is type-checked strictly and linted like the tests
-- [ ] T004 [P] Confirm `.editorconfig` and `.gitattributes` already cover `.py` and `.yml` under `actions/`, and extend them in this change if not
+- [X] T001 Write the four conventions the constitution pass rejected as invariants into `docs/ai-instructions.md`: a failure names what to change; tool prerequisites are pre-flighted; consumer tool versions stay the consumer's; an input named for a stage governs that stage. Each is a convention because a reviewer catches it and a revert restores the world
+- [X] T002 Add `actions/` to the linted trees: extend the `zizmor` line in `[tasks.lint]` in `mise.toml` to cover `actions/` as well as `.github/workflows`, since `actionlint` does not look outside `.github/workflows`
+- [X] T003 [P] Add `actions` to `[tool.pyright].include` and `[tool.ruff].src` in `pyproject.toml`, so the decision unit is type-checked strictly and linted like the tests
+- [X] T004 [P] Confirm `.editorconfig` and `.gitattributes` already cover `.py` and `.yml` under `actions/`, and extend them in this change if not
 
 ---
 
@@ -50,18 +50,39 @@ capability after this is born checked.
 
 **⚠️ CRITICAL**: No capability work begins until this phase is complete.
 
-- [ ] T005 Create `tests/published_surface.toml` holding the committed surface fixture, with the record shape from `data-model.md` and no capability rows yet — one table per capability, each with `kind`, `published`, `check_name`, `inputs`, `permissions`, `tool_prerequisites`, `skips_under`
-- [ ] T006 Create `tests/test_published_surface.py` asserting the tree matches the fixture: every `workflow_call` workflow and every `actions/*/action.yml` appears, its input name set matches, its permission demands match, and its composed check name matches. A missing or extra capability fails. This is principle IV's gate
-- [ ] T007 In `tests/test_published_surface.py`, assert the invariant from `data-model.md`: `check_name` is null for every action and non-null for every published workflow — a published workflow with no check name is a gate a consumer cannot require
-- [ ] T008 [P] Create `tests/test_no_interpolation.py` asserting no `run:` block in any workflow or action interpolates `${{ github.event.* }}`, `${{ inputs.* }}`, or any commit-derived value. Values reach code through `env:`. This is principle VI's gate
-- [ ] T009 [P] Create `tests/test_action_pins.py` asserting every third-party `uses:` is pinned to a full SHA, and that the one permitted self-reference by owner and moving ref is named in an exemption table with a reason, and is the only one
-- [ ] T010 [P] Create `tests/test_workflow_properties.py` with the event-skip table from `contracts/published-surface.md`: every event-conditional job-level `if:` appears in it with a non-empty reason, asserted. This is principle VII's gate
-- [ ] T011 In `tests/test_workflow_properties.py`, assert every job in every workflow declares `timeout-minutes`, that no capability declares a permission the fixture does not list, and that **every permission carries a reason beside it** — FR-004 makes the `permissions:` block its own documentation (R4), so an undocumented demand is the fact having no owner. Without this the gate is asymmetric: T010 already demands a reason for every event skip
-- [ ] T012 Add a principle I gate to `tests/test_workflow_properties.py`: no table in `README.md` has a header cell naming a default, so an input's default cannot acquire a second owner outside the capability YAML
-- [ ] T013 Restructure `README.md` to the shape R4 settled: one copyable call site per capability plus the prose saying what it is for and when not to reach for it, and no input tables. Leave a placeholder section per capability for the phases below to fill. **Rewrite the opening in this same change** — it currently says nothing ships yet and that this is not the repository consumers pin, and both become false the moment Phase 3 lands. Correcting it later would leave the tree carrying a false claim for four phases, and stale framing is a defect rather than a follow-up
-- [ ] T014 Add the new test modules to the tree's expectations — confirm `tests/test_instruction_layers.py` still passes with no new markdown outside an assigned layer, and add any new `docs/` file to its `LAYERS` map in the same change
+- [X] T005 Create `tests/published_surface.toml` holding the committed surface fixture, with the record shape from `data-model.md` and no capability rows yet — one table per capability, each with `kind`, `published`, `check_name`, `inputs`, `permissions`, `tool_prerequisites`, `skips_under`
+- [X] T006 Create `tests/test_published_surface.py` asserting the tree matches the fixture: every `workflow_call` workflow and every `actions/*/action.yml` appears, its input name set matches, its permission demands match, and its composed check name matches. A missing or extra capability fails. This is principle IV's gate
+- [X] T007 In `tests/test_published_surface.py`, assert the invariant from `data-model.md`: `check_name` is null for every action and non-null for every published workflow — a published workflow with no check name is a gate a consumer cannot require
+- [X] T008 [P] Create `tests/test_no_interpolation.py` asserting no `run:` block in any workflow or action interpolates `${{ github.event.* }}`, `${{ inputs.* }}`, or any commit-derived value. Values reach code through `env:`. This is principle VI's gate
+- [X] T009 [P] Create `tests/test_action_pins.py` asserting every third-party `uses:` is pinned to a full SHA, and that the one permitted self-reference by owner and moving ref is named in an exemption table with a reason, and is the only one
+- [X] T010 [P] Create `tests/test_workflow_properties.py` with the event-skip table from `contracts/published-surface.md`: every event-conditional job-level `if:` appears in it with a non-empty reason, asserted. This is principle VII's gate
+- [X] T011 In `tests/test_workflow_properties.py`, assert every job in every workflow declares `timeout-minutes`, that no capability declares a permission the fixture does not list, and that **every permission carries a reason beside it** — FR-004 makes the `permissions:` block its own documentation (R4), so an undocumented demand is the fact having no owner. Without this the gate is asymmetric: T010 already demands a reason for every event skip.
+  **Two of the three clauses were dropped as second owners** (principle I): `check-jsonschema
+  --builtin-schema custom.github-workflows-require-timeout` already asserts every job declares
+  `timeout-minutes`, and it is named in both `[tasks.lint]` and `.pre-commit-config.yaml` — which is
+  also where `quickstart.md` assigns that rule. And "no capability declares a permission the fixture
+  does not list" is one direction of the equality T006 already asserts over the merged demand. Only
+  the permission-reason clause was un-owned, so only it was written
+- [X] T012 Add a principle I gate to `tests/test_workflow_properties.py`: no table in `README.md` has a header cell naming a default, so an input's default cannot acquire a second owner outside the capability YAML
+- [X] T013 Restructure `README.md` to the shape R4 settled: one copyable call site per capability plus the prose saying what it is for and when not to reach for it, and no input tables. Leave a placeholder section per capability for the phases below to fill. **Rewrite the opening in this same change** — it currently says nothing ships yet and that this is not the repository consumers pin, and both become false the moment Phase 3 lands. Correcting it later would leave the tree carrying a false claim for four phases, and stale framing is a defect rather than a follow-up
+- [X] T014 Add the new test modules to the tree's expectations — confirm `tests/test_instruction_layers.py` still passes with no new markdown outside an assigned layer, and add any new `docs/` file to its `LAYERS` map in the same change
 
 **Checkpoint**: `mise run ci` green with four new gates that can fail and nothing yet to gate.
+
+Two shapes settled here that the phases below inherit:
+
+- **`skips_under` lives in the fixture, and `test_workflow_properties.py` reads it from there.** T010,
+  T030 and T068 read as putting the event-skip table in the test module while T005 makes it a fixture
+  field; holding both would be two owners of one table. Each entry is `{ jobs, event, reason }` — the
+  `jobs` list extends `data-model.md`'s `(event, reason)` so the gate can be per-job as T010 requires,
+  while one reason still covers several jobs skipping for it.
+- **`check_name` is a list, and the fixture holds input names only.** `conventional-commits` composes
+  two contexts, so a single string cannot hold what T024 asks for; and a default restated in the
+  fixture would be the exact second owner R4 removed.
+
+`tests/capabilities.py` is the one owner of how a workflow is read — the trigger key, the permission
+merge, the capability test. Four gates over the same YAML would otherwise each carry their own copy,
+including their own answer to `on:` being YAML 1.1's `true`.
 
 ---
 

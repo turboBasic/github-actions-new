@@ -17,12 +17,15 @@ dev = [
   "commitizen>=4.17",
   "yamllint>=1.35",
   "check-jsonschema>=0.33",
+  # The gates read the workflows and actions as structures. Declared rather than taken from
+  # yamllint's own dependency tree, which would drop it the day yamllint stopped needing it.
+  "pyyaml>=6.0",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-src = ["tests"]
+src = ["actions", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -39,7 +42,10 @@ select = [
 ignore = ["E501"] # line length is the formatter's job
 
 [tool.pyright]
-include = ["tests"]
+include = ["actions", "tests"]
+# `tests/capabilities.py` is the one owner of how a workflow is read; pytest reaches it by the test
+# file's own directory, and pyright needs the same directory named to resolve the import.
+extraPaths = ["tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
