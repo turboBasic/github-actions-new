@@ -25,6 +25,10 @@ hand-edited, which is why the name is surface and not a detail.
 | `prek-advisory.yml` | workflow | `prek-advisory` |
 | `release-decisions` | action | none — internal, composes nothing (OQ-003) |
 
+Every published capability is a callable workflow. `release-decisions` is the only action in the tree
+and is not published, so `actions/` holds exactly one directory: the advisory lint's composite-action
+form is cut rather than shipped alongside its workflow (FR-049a, F1).
+
 ## Inputs
 
 Names, and which are required. **Defaults live in the capability YAML and are deliberately not repeated
@@ -33,16 +37,18 @@ call site.
 
 | Capability | Inputs |
 | --- | --- |
-| `python-ci.yml` | `mise-version`, `run-lint`, `run-typecheck`, `run-tests`, `lint-task`, `typecheck-task`, `test-task`, `lint-changed-only`, `hook-stage`, `timeout-minutes` |
+| `python-ci.yml` | `run-lint`, `run-typecheck`, `run-tests`, `lint-task`, `typecheck-task`, `test-task`, `lint-changed-only`, `hook-stage`, `timeout-minutes` |
 | `conventional-commits.yml` | `check-title`, `check-commits`, `types`, `timeout-minutes` |
 | `pr-description.yml` | `template-path`, `timeout-minutes` |
 | `release.yml` | `dry-run` |
-| `prek-advisory.yml` | `mise-version`, `hook-stage`, `timeout-minutes` |
+| `prek-advisory.yml` | `hook-stage`, `timeout-minutes` |
 | `release-decisions` | `decision` (required), plus the per-question inputs; internal, so not compared |
 
 Deliberately absent, and each absence is a contract:
 
 - **No `cache-prek`** on either capability that caches. Caching is unconditional (FR-014a, OQ-007).
+- **No `mise-version`** on either capability that provisions the task runner. Six call sites could have
+  set it and none did, and removing an input is a break where adding one is not (FR-016a, F2).
 - **No `fail-on-severity`** anywhere. Dependency review is not a capability here (OQ-002).
 - **No identifying inputs on `pr-description.yml`** — no token, pull request number, repository or SHA
   range. The workflow owns its checkout and reads all of it from the run (FR-029a, OQ-010).

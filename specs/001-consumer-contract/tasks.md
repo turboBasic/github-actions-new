@@ -94,8 +94,8 @@ workflow with no inputs, granting only read access to contents.
 **Independent test**: This repository's own CI calls it with no inputs and reports one green
 `ci / python-ci`; breaking a task reddens exactly that check.
 
-- [ ] T015 [US1] Add the `python-ci` row to `tests/published_surface.toml`: check name `python-ci`, the ten inputs from `contracts/published-surface.md`, `contents: read`, and its tool prerequisites. Watch it fail — the capability does not exist yet
-- [ ] T016 [US1] Create `.github/workflows/python-ci.yml` with the `workflow_call` trigger and the ten declared inputs, each carrying its own description and default, and `contents: read`. Job named `python-ci` with `timeout-minutes` from the input
+- [ ] T015 [US1] Add the `python-ci` row to `tests/published_surface.toml`: check name `python-ci`, the nine inputs from `contracts/published-surface.md`, `contents: read`, and its tool prerequisites. Watch it fail — the capability does not exist yet
+- [ ] T016 [US1] Create `.github/workflows/python-ci.yml` with the `workflow_call` trigger and the nine declared inputs, each carrying its own description and default, and `contents: read`. Job named `python-ci` with `timeout-minutes` from the input
 - [ ] T017 [US1] Add the tool pre-flight step to `.github/workflows/python-ci.yml`: before invoking the package manager or the hook runner, check each is present and fail naming the tool, this capability, and where the consumer declares it (FR-009, OQ-005)
 - [ ] T018 [US1] Implement the lockfile check and the three stage steps in `.github/workflows/python-ci.yml`, task names reaching the runner through `env:` and never interpolated into a `run:` line
 - [ ] T019 [US1] Implement the changed-files lint path in `.github/workflows/python-ci.yml`, gated on the lint stage switch as well as on `lint-changed-only`, so switching lint off stops every kind of linting (FR-012a, OQ-008)
@@ -204,8 +204,8 @@ than duplicated on later pushes.
 **Independent test**: A lint finding outside the changed set produces one comment and a green check; a
 second push edits that comment rather than adding another.
 
-- [ ] T062 [US5] Settle finding F1 from `research.md` before writing anything here: cut the composite-action form of this capability, or keep it. Cutting it removes the moving self-reference the callable workflow would otherwise need. This decides whether `actions/` holds one directory or two
-- [ ] T063 [US5] Add the `prek-advisory` row to `tests/published_surface.toml`: check name `prek-advisory`, inputs `mise-version`, `hook-stage` and `timeout-minutes` — no `cache-prek` — `contents: read` and `pull-requests: write`
+- [X] T062 [US5] Settle finding F1 from `research.md` before writing anything here: cut the composite-action form of this capability, or keep it. Cutting it removes the moving self-reference the callable workflow would otherwise need. This decides whether `actions/` holds one directory or two. **Settled early, before Phase 3: cut.** The ruling and its reasoning are in `spec.md` (F1, FR-049a, and FR-001 which no longer reads as requiring both kinds). `actions/` holds one directory. Nothing to build here — this capability is a callable workflow and there is no second form to write
+- [ ] T063 [US5] Add the `prek-advisory` row to `tests/published_surface.toml`: check name `prek-advisory`, inputs `hook-stage` and `timeout-minutes` — no `cache-prek`, no `mise-version` — `contents: read` and `pull-requests: write`
 - [ ] T064 [US5] Create `.github/workflows/prek-advisory.yml` as a separate capability precisely because of its write demand, so a consumer can take the CI capability without granting write access (FR-003)
 - [ ] T079 [US5] **Executes before T065.** Add the tool pre-flight to `.github/workflows/prek-advisory.yml`, mirroring T017: `contracts/published-surface.md` lists this capability as needing both the package manager and the hook runner from the consumer's configuration, so both are checked before use and a missing one fails naming the tool, this capability, and where to declare it (FR-009). Omitting it here would leave the only capability that invokes consumer tools without a pre-flight
 - [ ] T065 [US5] Implement the whole-tree lint in `.github/workflows/prek-advisory.yml` with the finding non-blocking but the capability's own setup — including the lockfile check — still failing the check, and say so in the README: a green check means the lint ran, not that it passed (FR-047)
@@ -221,7 +221,7 @@ second push edits that comment rather than adding another.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T071 Settle finding F2 from `research.md`: keep or drop `mise-version`, which two capabilities declare and no consumer sets. Dropping it is cheaper now than after a consumer pins it. If dropped, remove it from both capabilities and from `tests/published_surface.toml` in one change
+- [X] T071 Settle finding F2 from `research.md`: keep or drop `mise-version`, which two capabilities declare and no consumer sets. Dropping it is cheaper now than after a consumer pins it. If dropped, remove it from both capabilities and from `tests/published_surface.toml` in one change. **Settled early, before Phase 3: drop.** The ruling and its reasoning are in `spec.md` (F2, FR-016a). Nothing to remove from `tests/published_surface.toml` — settling it ahead of Phase 3 means the input is never written into either capability, which is the whole point: doing this in Phase 8 as scheduled would have meant shipping it and then deleting it, and a deleted input is a new compatibility line
 - [ ] T072 [P] Sweep `README.md` for framing that the finished feature has made false, now that every section is filled. The opening was corrected in T013, when it first became wrong; this is the closing read of the whole document against what the tree actually ships
 - [ ] T073 [P] Add a `docs/technical-debt.md` row for the repository-rename debt if it still holds: every internal name is already the destination one while URLs carry the staging suffix, and the condition that clears it is the rename
 - [ ] T074 Write a decision record in `docs/decisions/` only if a ruling here clears the ADR bar — the likely candidate is R2, the one permitted self-reference and why it is structural. If it clears, add its `scope:` value to `docs/ai-instructions.md` in the same change if `instructions` and `tooling` do not cover it, and delete the `.gitkeep`
@@ -248,7 +248,9 @@ Phase 1 (Setup) ─────────► Phase 2 (Gates) ─────�
 - **Phase 5 depends on US1** — its release path verifies through the CI capability behind a dependency
   edge, which is the only verdict structurally true on the commit being tagged.
 - **US3 and US5 are independent of each other and of Phase 5**, and could run in parallel.
-- **T062 gates Phase 7's shape** and should be answered before T063.
+- **T062 and T071 are settled** — both ticked ahead of Phase 3 rather than in the phases that hold
+  them, which is what the closing note below argued for. Phase 7 knows its shape and Phase 3 knows its
+  input list before either is written.
 
 ## Parallel opportunities
 
@@ -270,6 +272,12 @@ Then increment: US2 makes the repository adoptable by the two consumers that onl
 grammar. US4 is what lets any of it be released at all, and is the phase to slow down in. US3 and US5
 are the reshaped ones and benefit from the pattern the earlier phases settle.
 
-Two decisions are deliberately deferred into the work rather than guessed at now: T062 before Phase 7,
-T071 in Phase 8. Both change published surface, and after Phase 5 exists that means both cost a
-compatibility line — which is the argument for settling them early, not the argument for guessing.
+Two decisions were scheduled into the work rather than guessed at now: T062 before Phase 7, T071 in
+Phase 8. Both change published surface, and after Phase 5 exists that means both cost a compatibility
+line — which is the argument for settling them early, not the argument for guessing.
+
+**Both were then settled before Phase 3, and the scheduling above is what changed.** Waiting until
+Phase 8 to drop `mise-version` would have meant writing it into two capabilities, releasing them, and
+deleting it afterwards; and a deleted input is exactly the compatibility line the paragraph above warns
+about. Neither answer needed anything the tree could only learn by building — which is what made
+settling them early free rather than a guess.

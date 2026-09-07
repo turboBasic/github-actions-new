@@ -161,6 +161,10 @@ cannot be withdrawn. Nothing in phase 3 ships without a dry run first.
 Two, both from research, both changing published surface — so both are the specification's to settle
 rather than the plan's. Neither blocks phase 1.
 
+**Both are now settled, and neither was carried as far as the phase that held it.** The rulings are in
+`spec.md` under *Rulings*: F1 cuts the action form, F2 deletes the input. Read the two entries below as
+the questions, not as anything still open.
+
 - **F1 — cut the advisory lint's composite-action form?** FR-049 publishes it as both a workflow and an
   action. No consumer has used the action form, and its existence is the only thing forcing the callable
   workflow to hold a moving self-reference. Cutting it makes that exception vanish. This decides whether

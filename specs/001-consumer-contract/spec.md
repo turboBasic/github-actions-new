@@ -263,10 +263,12 @@ pinned, without editing its own workflow.
 
 #### The shape of the offering
 
-- **FR-001**: The repository MUST publish its capabilities as two kinds of thing a consumer names in
-  its own workflow: callable workflows, which a consumer calls as a whole job and which own their own
-  runner, checkout and tool provisioning; and composite actions, which a consumer places as a step
-  inside a job it owns.
+- **FR-001**: Every published capability MUST be one of two kinds of thing a consumer names in its own
+  workflow: a callable workflow, which a consumer calls as a whole job and which owns its own runner,
+  checkout and tool provisioning; or a composite action, which a consumer places as a step inside a
+  job it owns. Which kinds are in use is decided per capability by what the capability needs, not by a
+  requirement that both be represented — and as settled by F1, the published set today is callable
+  workflows alone.
 - **FR-002**: Every published capability MUST be resolvable by ref from a consumer repository, and
   MUST NOT require the consumer to vendor, copy or fork anything to use it.
 - **FR-003**: A capability MUST NOT require the consumer to grant any permission it does not use.
@@ -329,7 +331,6 @@ pinned, without editing its own workflow.
 
   | Input | Default | What the consumer gets |
   | --- | --- | --- |
-  | `mise-version` | `""` | Pins the task-runner release; empty takes the provisioning action's own default |
   | `run-lint` | `true` | Runs the lint stage |
   | `run-typecheck` | `true` | Runs the typecheck stage |
   | `run-tests` | `true` | Runs the test stage |
@@ -343,6 +344,14 @@ pinned, without editing its own workflow.
   Outputs: none. Permissions the consumer grants: read access to contents. Check name composed:
   `python-ci`. Prerequisites in the consumer's tree: a task-runner configuration declaring the tasks
   being run and pinning the tools they need, and a current lockfile.
+
+- **FR-016a**: No capability takes an input pinning the task-runner's own release (ruling, F2). No
+  call site in any consumer set the one that existed, this repository's own CI does not set it either,
+  and its default did nothing — so its only effect anywhere was to be surface that could be depended
+  on. The same deletion applies to the advisory lint, which declared it for the same reason and with
+  the same evidence. Removing an input is a breaking change and adding one is not, so the absence is
+  the reversible choice: if a task-runner release ever breaks every consumer at once, the input comes
+  back on the same compatibility line and no call site has to change.
 
 #### Commit and title grammar
 
@@ -472,14 +481,17 @@ pinned, without editing its own workflow.
 
   | Input | Default | What the consumer gets |
   | --- | --- | --- |
-  | `mise-version` | `""` | Pins the task-runner release |
   | `hook-stage` | `""` | Hook stage; empty is the default stage |
   | `timeout-minutes` | `20` | Job timeout |
 
   Outputs: none. Permissions the consumer grants: read access to contents and **write access to pull
-  requests**. Check name composed: `prek-advisory`. The same capability is also published as a
-  composite action taking a token and a hook stage, for a consumer placing it in a job it already
-  owns; that form expects the lint tool to be already provisioned.
+  requests**. Check name composed: `prek-advisory`.
+
+- **FR-049a**: This capability MUST be a callable workflow and nothing else (ruling, F1). It is not
+  also published as a composite action a consumer places in a job it already owns. That form was never
+  called, it would have put the write permission back inside the consumer's own job — which is the one
+  thing separating this capability from the CI one buys — and its existence is what would force the
+  callable workflow to name this repository by a moving ref.
 
 #### Release decisions — internal, not consumer surface
 
@@ -600,6 +612,26 @@ otherwise have carried forward by default.
   callable workflow owning that checkout, so the call site is one `uses:` and one permission, and the
   five identifying inputs disappear along with the shallow-checkout trap. The composite-action form is
   not carried forward. See FR-029a and FR-031.
+- **F1 — The advisory lint is a callable workflow only.** Raised by the planning research rather than
+  by a disagreement between the observed behaviour and the advertised contract, and settled here
+  because it changes what is published. The action form was never called by anyone. It would have put
+  the `pull-requests: write` demand back inside a job the consumer owns, which cancels the one thing
+  FR-003 separates this capability out to achieve. And it is what would force the callable workflow to
+  name this repository by a moving ref, so cutting it leaves exactly one such reference in the tree
+  instead of two. This is OQ-010's reasoning applied to the one place it had not been. The published
+  set is therefore five callable workflows and no composite action, which is why FR-001 no longer reads
+  as requiring both kinds. Re-adding an action later would be a new capability rather than a change to
+  this one, so nothing about this decision is expensive to revisit. See FR-001 and FR-049a.
+- **F2 — `mise-version` is not an input.** Two capabilities declared it, six call sites could have set
+  it — the four consumers, plus this repository's own CI on each of the two capabilities — and none
+  did. Its default did nothing, so at every real call site its effect was to exist. That is the shape
+  OQ-007 already ruled on: an input no consumer sets, doing nothing at the value everyone gets, is
+  worse than no input. What decides the timing rather than the answer is that **removing an input is a
+  breaking change and adding one is not**: deleting it now costs nothing and cannot be got wrong,
+  whereas keeping it becomes irreversible the moment a consumer names it. The one thing genuinely lost
+  is the only escape hatch a consumer has if a task-runner release breaks every repository at once —
+  and that hatch can be restored additively, on the same compatibility line, the day it is wanted. See
+  FR-016a.
 
 ## Open Questions
 
