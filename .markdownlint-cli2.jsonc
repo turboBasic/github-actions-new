@@ -1,0 +1,32 @@
+{
+  "gitignore": true,
+  // `gitignore` covers tmp/ on the CLI; the VS Code extension needs it spelled out or it
+  // flags scratch files in Problems.
+  "ignores": [
+    "tmp/**",
+    // Vendored Spec Kit machinery, rewritten by `specify` on every refresh.
+    // `.specify/memory/constitution.md` is ours, so it stays linted.
+    ".specify/templates/**",
+    ".claude/skills/speckit-*/**"
+  ],
+  // MD013 (line length): prose here is never rewrapped, so `line_length` is effectively off
+  "config": {
+    "default": true,
+    "MD013": {
+      "line_length": 100000,
+      "heading_line_length": 80
+    }
+  },
+  // Intentionally headless: the template opens on a comment that renders away
+  "overrides": [
+    {
+      "filter": [
+        ".github/PULL_REQUEST_TEMPLATE.md"
+      ],
+      "config": {
+        "MD041": false
+      },
+      "combine": "merge"
+    }
+  ]
+}

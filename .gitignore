@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# uv / venv
+.venv/
+.python-version
+
+# Tooling caches
+.pyright/
+.ruff_cache/
+.pytest_cache/
+.cache/
+
+# mise
+.mise/
+
+# Editors / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/*.code-workspace
+.idea/
+.DS_Store
+
+# Claude settings example file
+!.claude/settings.local.example.json
+
+# Logs, temp, build files
+tmp/
+*.tmp
+*.log

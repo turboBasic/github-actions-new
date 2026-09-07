@@ -1,0 +1,65 @@
+[tools]
+actionlint = "1.7.12"
+"npm:cspell" = "10.2.2"
+"npm:markdownlint-cli2" = "0.23.2"
+"pipx:specify-cli" = "1.0.4"
+prek = "0.5.2"
+python = "3.14"
+taplo = "0.10.0"
+uv = "0.12.10"
+zizmor = "1.30.0"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.setup]
+description = "Install tools, dependencies and git hooks"
+run = [
+  "mise install",
+  "uv sync --locked",
+  "prek install",
+]
+
+[tasks.fmt]
+description = "Format code with ruff, TOML with taplo"
+run = [
+  "uv run ruff format .",
+  # No `.`: a positional is a glob taplo then filters against `include` (default `**/*.toml`),
+  # never a directory it walks. `.` matches one path — the directory — which is not a `.toml`,
+  # so taplo drops it and formats nothing, silently. Bare `taplo fmt` uses `include` directly,
+  # which is what the `taplo-fmt` hook relies on too.
+  "taplo fmt",
+]
+
+[tasks.lint]
+description = "Lint workflows, prose, spelling, and GitHub config schemas"
+run = [
+  "uv run ruff check .",
+  "uv run yamllint --strict .",
+  "actionlint",
+  "zizmor --pedantic .github/workflows",
+  "markdownlint-cli2 \"**/*.md\"",
+  "cspell lint --no-progress .",
+  "uv run check-jsonschema --builtin-schema vendor.github-issue-forms .github/ISSUE_TEMPLATE/[0-9]-*.yml",
+  "uv run check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml",
+  "uv run check-jsonschema --builtin-schema custom.github-workflows-require-timeout .github/workflows/*.yml",
+]
+
+[tasks.typecheck]
+description = "Type-check with pyright"
+run = "uv run pyright"
+
+[tasks.test]
+description = "Run the test suite"
+run = "uv run pytest"
+
+[tasks.ci]
+description = "Run everything CI runs, locally"
+depends = ["lint", "typecheck", "test"]
+
+# Never `specify self upgrade` — it replaces the binary behind mise's back, leaving
+# the committed manifests describing a version nothing here pins. Bump
+# `pipx:specify-cli` above, then run this to bring the vendored files with it.
+[tasks.spec-kit-upgrade]
+description = "Re-sync .specify/ and the speckit skills to the pinned specify-cli"
+run = "specify integration upgrade claude"

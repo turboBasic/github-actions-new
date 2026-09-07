@@ -1,0 +1,126 @@
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Vendored Spec Kit files are rewritten byte-for-byte by
+      # `specify integration upgrade`, so reformatting them here churns on every
+      # upgrade. `workflow-registry.json` ships with no final newline. The one file
+      # there we author, memory/constitution.md, is still covered by markdownlint
+      # (MD009, MD047).
+      - id: trailing-whitespace
+        exclude: &vendored_speckit ^(\.specify/|\.claude/skills/speckit-)
+      - id: end-of-file-fixer
+        exclude: *vendored_speckit
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      # `-system` runs the actionlint on PATH, so mise.toml owns the version and this rev pins only
+      # the hook definition. The plain `actionlint` id builds its own at this rev and
+      # `actionlint-docker` hardcodes an image tag — either would lint with a second version.
+      - id: actionlint-system
+
+  - repo: local
+    hooks:
+      # uv.lock owns commitizen's version, for the same reason it owns ruff's below: upstream's
+      # `commitizen` hook is `language: python`, so prek would build its own at a `rev` Renovate
+      # bumps independently of the lockfile. `--allow-abort` and `--commit-msg-file` are upstream's
+      # own args; the runner appends the message path.
+      - id: commitizen
+        name: commitizen check
+        entry: uv run cz check --allow-abort --commit-msg-file
+        language: system
+        stages: [commit-msg]
+
+      # uv.lock owns ruff's version, as it already owns pyright's below. The ruff-pre-commit repo
+      # builds its own ruff at a `rev` Renovate bumps independently of the lockfile, so the hook and
+      # `mise run lint` could format one file two ways with neither file looking wrong.
+      # `--force-exclude` keeps pyproject.toml's excludes honoured when filenames arrive explicitly.
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --force-exclude --fix
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # .yamllint.yaml owns which rules apply and which paths are exempt.
+      - id: yamllint
+        name: yamllint
+        entry: uv run yamllint --strict
+        language: system
+        types: [yaml]
+
+      # GitHub silently ignores a key it does not recognise in either of these.
+      - id: check-issue-forms
+        name: check-jsonschema (issue forms)
+        entry: uv run check-jsonschema --builtin-schema vendor.github-issue-forms
+        language: system
+        files: ^\.github/ISSUE_TEMPLATE/(?!config\.)[^/]+\.ya?ml$
+
+      - id: check-issue-config
+        name: check-jsonschema (issue template config)
+        entry: uv run check-jsonschema --builtin-schema vendor.github-issue-config
+        language: system
+        files: ^\.github/ISSUE_TEMPLATE/config\.ya?ml$
+
+      # Not a schema: asserts every job sets timeout-minutes.
+      - id: check-workflow-timeouts
+        name: check-jsonschema (workflow timeouts)
+        entry: uv run check-jsonschema --builtin-schema custom.github-workflows-require-timeout
+        language: system
+        files: ^\.github/workflows/[^/]+\.ya?ml$
+
+      # actionlint does not look outside .github/workflows.
+      - id: zizmor
+        name: zizmor
+        entry: mise exec -- zizmor --pedantic
+        language: system
+        pass_filenames: true
+        files: ^(\.github/workflows/.*\.ya?ml|actions/.*/action\.ya?ml)$
+
+      # No filenames: .taplo.toml's exclude/include decide which TOML is ours.
+      - id: taplo-fmt
+        name: taplo fmt
+        entry: mise exec -- taplo fmt
+        language: system
+        types: [toml]
+        pass_filenames: false
+
+      # .markdownlint-cli2.jsonc owns which rules apply and which files are exempt.
+      - id: markdownlint-cli2
+        name: markdownlint-cli2
+        entry: mise exec -- markdownlint-cli2
+        language: system
+        types: [markdown]
+
+      # .cspell.config.yaml owns dictionaries and ignored paths. Scoped to the
+      # pre-commit stage: `types: [text]` also matches the commit-msg stage's
+      # message file, which cspell then fails on ("0 files checked").
+      # `--no-must-find-files` covers the same failure inside the pre-commit stage:
+      # a batch consisting only of ignorePaths matches (the vendored Spec Kit files)
+      # leaves cspell with nothing to check, which is not an error.
+      - id: cspell
+        name: cspell
+        entry: mise exec -- cspell lint --no-progress --no-must-find-files
+        language: system
+        types: [text]
+        stages: [pre-commit]

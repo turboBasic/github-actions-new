@@ -1,0 +1,49 @@
+# Documentation: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+
+name: Bug report
+description: Something behaves differently than documented
+title: "fix: "
+labels: ["kind:bug"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Before filing
+      options:
+        - label: >-
+            I searched the [open and closed
+            issues](https://github.com/turboBasic/github-actions-new/issues?q=is%3Aissue)
+            for a duplicate.
+          required: true
+
+  - type: input
+    id: component
+    attributes:
+      label: Which one
+      description: The workflow, action or file that misbehaves.
+    validations:
+      required: true
+
+  - type: input
+    id: ref
+    attributes:
+      label: Ref you called it at
+      description: The `@…` in your `uses:` line. Leave blank if this is not a call site.
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected instead
+      description: >
+        A link to a failing run tells us more than a description does — paste one if the
+        repository is public. Otherwise the relevant log lines are enough.
+    validations:
+      required: true
+
+  - type: textarea
+    id: call-site
+    attributes:
+      label: Call site
+      description: The job that calls it, including any inputs you set.
+      render: yaml
