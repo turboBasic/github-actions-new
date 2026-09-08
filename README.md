@@ -231,7 +231,43 @@ widening the surface while looking configured is the failure nobody would notice
 
 ### `prek-advisory`
 
-Not shipped yet.
+Lints the whole tree and reports it as one pull request comment, edited in place on later pushes rather
+than duplicated, plus a job summary and a warning annotation. It is what compensates for `python-ci`'s
+`lint-changed-only`: that reads the diff, this reads everything.
+
+```yaml
+name: advisory
+
+on:
+  pull_request:
+
+jobs:
+  advisory:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: turboBasic/github-actions-new/.github/workflows/prek-advisory.yml@v0.1
+```
+
+Context composed: `advisory / prek-advisory`. **Do not require it in a ruleset** — see below.
+
+**A green check means the lint ran, not that it passed.** Only the lint's verdict is advisory. The
+capability's own setup still fails the check: a missing tool, or a lockfile disagreeing with its
+manifest, reddens it, because a tree that cannot be set up has not been linted. The findings themselves
+never fail anything — they go in the comment.
+
+That is also why requiring this context is a mistake rather than caution: it is green either way, so as
+a required gate it would pass without judging anything, and a green check is the one nobody
+investigates.
+
+**`pull-requests: write` is not optional, and omitting it is the worst failure mode here.** The run
+fails at startup before any job exists — no log, no annotation, nothing to read, and no condition can
+skip past it. That write is the entire reason this is a separate capability from `python-ci`: a workflow
+demanding it anywhere forces every caller to grant it, so keeping the two apart is what lets you take
+CI without handing write access to your pull requests.
+
+**Pass the same `hook-stage` you pass to `python-ci`.** Different stages mean the two runs disagree
+about which checks apply, and the comment then reports on a set of hooks the blocking check never ran.
 
 ## Versioning
 

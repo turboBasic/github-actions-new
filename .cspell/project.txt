@@ -28,6 +28,7 @@ zizmorcore
 
 # --- Library and API identifiers ---
 pyupgrade
+rawfile
 schemafile
 stdlib
 

@@ -63,6 +63,7 @@ addopts = ["-ra"]
 [tool.turbobasic-release]
 include = [".github/workflows", "actions"]
 exclude = [
+  ".github/workflows/advisory.yml",
   ".github/workflows/ci.yml",
   ".github/workflows/commit-messages.yml",
   ".github/workflows/describe-pr.yml",
