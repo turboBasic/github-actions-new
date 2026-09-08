@@ -121,8 +121,13 @@ jobs:
           printf 'number=%s\n' "$number" >> "$GITHUB_OUTPUT"
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
-      # Written through the contents API rather than a push: a token in a remote URL would be a secret
-      # on a command line, and a persisted credential would be one in a file.
+      # One commit carrying the manifest and the lockfile together. The lockfile records the project's
+      # own version, so moving the manifest without it leaves `uv sync --locked` failing on the proposal
+      # branch — which reddens every check on the very pull request whose merge is meant to release. Two
+      # writes would also push a transiently broken state and fire a run against it.
+      #
+      # Built through the git data API rather than pushed: a token in a remote URL would be a secret on a
+      # command line, and a persisted credential would be one in a file.
       - name: Put the version on the proposal branch
         if: steps.close.outputs.empty != 'true'
         env:
@@ -131,20 +136,44 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           COMMIT: ${{ github.sha }}
         run: |
-          gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$PROPOSAL_BRANCH" -F force=true -f "sha=$COMMIT" \
-            || gh api "repos/$GH_REPO/git/refs" -f "ref=refs/heads/$PROPOSAL_BRANCH" -f "sha=$COMMIT"
-          python3 - <<'PY' > "$RUNNER_TEMP/manifest.b64"
-          import base64, os, pathlib, re
-          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
-          bumped = re.sub(r'(?m)^version = ".*"$', f'version = "{os.environ["VERSION"]}"', text, count=1)
-          print(base64.b64encode(bumped.encode()).decode())
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          bumped = re.sub(
+              r'(?m)^version = ".*"$', f'version = "{os.environ["VERSION"]}"', text, count=1
+          )
+          path.write_text(bumped, encoding="utf-8")
           PY
-          blob=$(gh api "repos/$GH_REPO/contents/pyproject.toml?ref=$PROPOSAL_BRANCH" --jq .sha)
-          gh api -X PUT "repos/$GH_REPO/contents/pyproject.toml" \
-            -f "message=chore: propose $VERSION" \
-            -f "content=$(cat "$RUNNER_TEMP/manifest.b64")" \
-            -f "sha=$blob" \
-            -f "branch=$PROPOSAL_BRANCH" > /dev/null
+          uv lock
+
+          blob() {
+            jq -n --arg content "$(base64 -w0 < "$1")" '{content: $content, encoding: "base64"}' \
+              > "$RUNNER_TEMP/blob.json"
+            gh api "repos/$GH_REPO/git/blobs" --input "$RUNNER_TEMP/blob.json" --jq .sha
+          }
+          manifest=$(blob pyproject.toml)
+          lockfile=$(blob uv.lock)
+
+          base=$(gh api "repos/$GH_REPO/git/commits/$COMMIT" --jq .tree.sha)
+          jq -n --arg base "$base" --arg m "$manifest" --arg l "$lockfile" '{
+            base_tree: $base,
+            tree: [
+              {path: "pyproject.toml", mode: "100644", type: "blob", sha: $m},
+              {path: "uv.lock", mode: "100644", type: "blob", sha: $l}
+            ]
+          }' > "$RUNNER_TEMP/tree.json"
+          tree=$(gh api "repos/$GH_REPO/git/trees" --input "$RUNNER_TEMP/tree.json" --jq .sha)
+
+          jq -n --arg m "chore: propose $VERSION" --arg t "$tree" --arg p "$COMMIT" \
+            '{message: $m, tree: $t, parents: [$p]}' > "$RUNNER_TEMP/commit.json"
+          proposed=$(gh api "repos/$GH_REPO/git/commits" --input "$RUNNER_TEMP/commit.json" --jq .sha)
+
+          gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$PROPOSAL_BRANCH" -F force=true -f "sha=$proposed" \
+            || gh api "repos/$GH_REPO/git/refs" -f "ref=refs/heads/$PROPOSAL_BRANCH" -f "sha=$proposed"
 
       - name: Open or refresh the proposal
         if: steps.close.outputs.empty != 'true'
