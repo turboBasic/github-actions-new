@@ -317,3 +317,36 @@ def test_neither_verdict_is_reached_by_a_range_holding_neither() -> None:
 
 def test_one_break_anywhere_in_the_range_counts() -> None:
     assert range_verdicts(["docs: reword", "refactor!: move a call site"]) == (True, False)
+
+
+def test_a_routine_push_declines_quietly_even_when_the_range_breaks_something() -> None:
+    # The version is behind, so it has not been bumped yet; a break "on a released line" only restates
+    # that. Reddening the default branch here trains people to ignore a red default branch.
+    verdict = decide(
+        ADMITTED._replace(
+            occasion=ROUTINE, version_text="0.1.0", existing=((0, 1, 0),), breaking=True
+        )
+    )
+    assert verdict.proceed is False
+    assert verdict.severity == NOTICE
+
+
+def test_a_routine_push_declines_quietly_when_the_range_renders_no_notes_either() -> None:
+    verdict = decide(
+        ADMITTED._replace(occasion=ROUTINE, version_text="0.1.0", existing=((0, 1, 0),), notes="")
+    )
+    assert verdict.proceed is False
+    assert verdict.severity == NOTICE
+
+
+def test_a_bumped_version_that_breaks_its_own_released_line_is_an_error_on_any_occasion() -> None:
+    # The one this must not swallow. 0.1.5 is ahead of 0.1.0, so somebody asserted it — and releasing it
+    # would force `v0.1` across a break, which is the thing a moving ref exists to prevent.
+    for occasion in (ROUTINE, DELIBERATE):
+        verdict = decide(
+            ADMITTED._replace(
+                occasion=occasion, version_text="0.1.5", existing=((0, 1, 0),), breaking=True
+            )
+        )
+        assert verdict.proceed is False, occasion
+        assert verdict.severity == ERROR, occasion
