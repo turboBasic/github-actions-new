@@ -5,7 +5,7 @@ name: release-on-merge
 # withdrawn once pushed.
 on:
   push:
-    branches: [main]
+    branches: [sandbox]
   workflow_dispatch:
     inputs:
       dry-run:

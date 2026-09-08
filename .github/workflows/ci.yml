@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [sandbox]
   pull_request:
 
 # The caller owns concurrency; this workflow has triggers of its own, so it is its own caller.
