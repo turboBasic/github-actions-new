@@ -1,17 +1,12 @@
 # zizmor's own config, read by both `mise run lint` and the prek hook.
 #
-# One reference in this repository may name a ref rather than a hash, and this is where that is
-# declared. The release capability is a reusable workflow: its checkout is the caller's tree, so a
-# workspace-relative path resolves into the consumer's repository, and it cannot interpolate its own
-# ref — so it can reach neither its own files nor the ref the consumer pinned. The ref is a literal
-# because nothing else exists to use, not because pinning was inconvenient.
+# One reference in this repository may name a ref rather than a hash. `EXEMPT` in
+# `tests/test_action_pins.py` names which and says why, and is stricter than this file: it asserts that
+# exactly one exists, that it is this owner's, and that its ref is a moving one.
 #
-# The pattern carries the trailing `/*` because the reference names a path inside this repository, and
-# a pattern without it matches the repository root only. Everything else stays hash-pinned, including
+# The pattern carries the trailing `/*` because the reference names a path inside this repository, and a
+# pattern without it matches the repository root only. Everything else stays hash-pinned, including
 # anything else of this owner's.
-#
-# `tests/test_action_pins.py` is stricter than this file: it asserts exactly one such reference exists,
-# that it is this owner's, that its ref is a moving one, and that it carries a written reason.
 rules:
   unpinned-uses:
     config:

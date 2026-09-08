@@ -1,6 +1,7 @@
 # turboBasic/github-actions
 
-Reusable GitHub Actions workflows and composite actions for `turboBasic` repositories.
+Five reusable GitHub Actions workflows for `turboBasic` repositories. Every published capability is a
+callable workflow: none is offered as a composite action a consumer places in a job it already owns.
 
 The work is staged at
 [`turboBasic/github-actions-new`](https://github.com/turboBasic/github-actions-new) and replaces
@@ -187,7 +188,7 @@ jobs:
   verify:
     permissions:
       contents: read
-    uses: your-org/your-repo/.github/workflows/ci.yml@v1
+    uses: turboBasic/github-actions-new/.github/workflows/python-ci.yml@v0.1
 
   release:
     needs: verify

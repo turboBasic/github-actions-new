@@ -4,9 +4,10 @@ The conventions layer: how work is done here, binding humans and AI coding tools
 Copilot) alike. The invariants are a layer above and are cited here by principle number; the entry
 point says where every kind of instruction lives.
 
-Scope: reusable GitHub Actions workflows and composite actions consumed by other `turboBasic`
-repositories. This repo ships no application. Its Python exists to support the actions and to assert
-properties of the YAML.
+Scope: reusable GitHub Actions workflows consumed by other `turboBasic` repositories, plus the one
+internal composite action a capability depends on — nothing here is published as an action. This
+repository ships no application. Its Python exists to support the actions and to assert properties of
+the YAML.
 
 Committed configuration is authoritative for settings it already declares: read it rather than
 assuming, extend it, and never regenerate it. The entry point names which file holds what.

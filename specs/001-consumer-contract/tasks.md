@@ -222,11 +222,31 @@ second push edits that comment rather than adding another.
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [X] T071 Settle finding F2 from `research.md`: keep or drop `mise-version`, which two capabilities declare and no consumer sets. Dropping it is cheaper now than after a consumer pins it. If dropped, remove it from both capabilities and from `tests/published_surface.toml` in one change. **Settled early, before Phase 3: drop.** The ruling and its reasoning are in `spec.md` (F2, FR-016a). Nothing to remove from `tests/published_surface.toml` — settling it ahead of Phase 3 means the input is never written into either capability, which is the whole point: doing this in Phase 8 as scheduled would have meant shipping it and then deleting it, and a deleted input is a new compatibility line
-- [ ] T072 [P] Sweep `README.md` for framing that the finished feature has made false, now that every section is filled. The opening was corrected in T013, when it first became wrong; this is the closing read of the whole document against what the tree actually ships
-- [ ] T073 [P] Add a `docs/technical-debt.md` row for the repository-rename debt if it still holds: every internal name is already the destination one while URLs carry the staging suffix, and the condition that clears it is the rename
-- [ ] T074 Write a decision record in `docs/decisions/` only if a ruling here clears the ADR bar — the likely candidate is R2, the one permitted self-reference and why it is structural. If it clears, add its `scope:` value to `docs/ai-instructions.md` in the same change if `instructions` and `tooling` do not cover it, and delete the `.gitkeep`
+- [X] T072 [P] Sweep `README.md` for framing that the finished feature has made false, now that every section is filled. The opening was corrected in T013, when it first became wrong; this is the closing read of the whole document against what the tree actually ships
+- [X] T073 [P] Add a `docs/technical-debt.md` row for the repository-rename debt if it still holds: every internal name is already the destination one while URLs carry the staging suffix, and the condition that clears it is the rename
+  **No row was owed.** The rename itself is planned work rather than a deliberate corner, and the one
+  part that would have drifted in silence — a `uses:` slug, which GitHub's rename redirect keeps
+  resolving exactly as it does a stale URL — is now gated instead. `tests/test_repo_urls.py` asserts every
+  `uses:` slug names the repository this clone actually is, which is the same reasoning that made the URL
+  check a gate rather than a note.
+- [X] T074 Write a decision record in `docs/decisions/` only if a ruling here clears the ADR bar — the likely candidate is R2, the one permitted self-reference and why it is structural. If it clears, add its `scope:` value to `docs/ai-instructions.md` in the same change if `instructions` and `tooling` do not cover it, and delete the `.gitkeep`
+  **It does not clear the bar, so no record was written.** Reversal costs nothing because the constraint
+  is GitHub's rather than ours — a reusable workflow's checkout is the caller's tree and it cannot
+  interpolate its own ref — and the question is answerable from the code in four places already:
+  `EXEMPT`'s required reason, `.github/zizmor.yml`, the step comment in `release.yml`, and the README. The
+  gate is the record. A fifth statement of one fact is the fork principle I exists to remove, and the
+  audit shortened `.github/zizmor.yml` to cite rather than restate. `.gitkeep` stays; the `scope:` list is
+  unchanged.
 - [ ] T075 Verify each capability against `quickstart.md` section 3 on a real pull request, including the one thing no gate can prove: that removing a permission demand from a call site fails the run at startup with no job and no log
-- [ ] T076 Confirm `mise run ci` is green and needed no network at any point
+  **The only task that cannot be done from a working copy.** It needs the branch pushed and a real pull
+  request: `ci / python-ci`, `commits / pr-title`, `commits / commit-messages`,
+  `describe / pr-description` and `advisory / prek-advisory` all reporting, the advisory comment
+  appearing once and being edited rather than duplicated on a second push, and a dry-run dispatch of
+  the release path creating nothing. The permission shortfall has to be tried on a scratch branch,
+  because the tree is the side that is correct.
+- [X] T076 Confirm `mise run ci` is green and needed no network at any point
+  Verified under a real network block, not a proxy: `sandbox-exec -p '(version 1)(allow default)(deny
+  network*)' mise run ci` is green — 76 tests, every linter, no reachability of any kind.
 
 ---
 
