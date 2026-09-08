@@ -79,12 +79,12 @@ jobs:
             printf '%s\n' "$DELIMITER"
           } >> "$GITHUB_OUTPUT"
 
-      # The one reference in this repository named by owner and moving ref rather than pinned to a
-      # SHA. A reusable workflow runs its checkout against the caller's tree and cannot interpolate its
-      # own ref, so it can reach neither its own files nor the ref the consumer pinned. See README.
+      # `$/` is resolved from the repository owning this file rather than from the workspace, so this
+      # reaches our own action even though the checkout above is the caller's tree — and it carries no
+      # ref, so there is nothing to pin and nothing to bootstrap.
       - id: decide
         name: Run every refusal, before any ref exists
-        uses: turboBasic/github-actions-new/actions/release-decisions@v0.1
+        uses: $/actions/release-decisions
         with:
           decision: release-verdict
           version: ${{ steps.gather.outputs.version }}
