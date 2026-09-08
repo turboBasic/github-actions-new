@@ -263,9 +263,14 @@ def decide(request: Request) -> Verdict:
         )
     if not found:
         return Verdict(True, NOTICE, f"every refusal passed for {request.version_text}")
-    if request.occasion == ROUTINE and [r.key for r in found] == [ALREADY_RELEASED]:
-        # A default branch must not redden for doing nothing wrong: a merge that did not bump the
-        # version is not a mistake. Every other refusal is a defect whichever event reached it.
+    if request.occasion == ROUTINE and ALREADY_RELEASED in [r.key for r in found]:
+        # A version that is not ahead of the highest release has not been bumped yet, which makes it
+        # provisional — so nothing below it can be assessed. A break "on a released line" then only says
+        # the bump has not happened, and a default branch must not redden for that.
+        #
+        # This softens only while the version is behind. A version that *is* ahead has been asserted by
+        # a merged change, so anything wrong with it is a real mistake and stays an error however the
+        # run was reached — including a break that would move a ref consumers pin.
         return Verdict(False, NOTICE, reported)
     return Verdict(False, ERROR, reported)
 

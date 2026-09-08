@@ -223,9 +223,17 @@ once published — a wrong one cannot be deleted, only lived with.
 It refuses, always before any ref exists, when the run is not on your repository's own default branch;
 when the declared version is not a plain `N.N.N`; when that version is not ahead of the highest release
 across *every* compatibility line; when the range renders no notes; or when the range breaks your
-consumer surface while the version stays on a line that already has a release. A routine merge that
-simply did not bump the version declines with a notice instead of failing — your default branch should
-not redden for doing nothing wrong.
+consumer surface while the version stays on a line that already has a release.
+
+**A routine merge never reddens your default branch.** While the version has not been bumped past the
+highest release it is provisional, so nothing else about it can be judged yet — the run declines with a
+notice and releases nothing, whatever the range contains. Releasing is therefore what merging a version
+bump does, not something every merge attempts.
+
+The one thing that does redden it is a version that *has* been bumped and is wrong for its range: a
+break while the new version stays on a line that already has a release, which would force a ref your
+consumers pin across that break. That is asserted rather than provisional, so it fails however the run
+was reached.
 
 Prerequisites in the calling repository: `git-cliff` pinned in `mise.toml`, a `cliff.toml` mapping
 commit types to sections, a `[project].version` in `pyproject.toml`, and the surface declaration below.
