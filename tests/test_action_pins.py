@@ -2,26 +2,13 @@ import re
 
 from capabilities import every_yaml, values_at
 
-OWNER = "turboBasic"
-
 # A tag is a moving target and a branch is anyone's to push to, so a third-party step is named by the
-# commit it resolves to. `./` and `$/` name this repository's own tree at the caller's commit and
-# carry no ref at all, so there is nothing to pin.
+# commit it resolves to. There is no exemption and no mechanism for one: `./` and `$/` name this
+# repository's own tree and carry no ref, and `$/` is resolved from the repository owning the file
+# rather than from the workspace — so even a reusable workflow running against a caller's checkout
+# reaches its own actions without naming a ref. Nothing else needs to.
 SAME_REPOSITORY = ("./", "$/")
 SHA = re.compile(r"^[0-9a-f]{40}$")
-MOVING_REF = re.compile(r"^v\d+(\.\d+)?$")
-
-# Exactly one self-reference by owner and moving ref is permitted, and only because a reusable
-# workflow runs its checkout against the caller's tree and cannot interpolate its own ref — so it can
-# reach neither its own files nor the ref the consumer pinned. Nothing here is a preference, and
-# nothing else earns it.
-EXEMPT: dict[str, str] = {
-    "turboBasic/github-actions-new/actions/release-decisions@v0.1": (
-        "the release capability is a reusable workflow, so its checkout is the caller's tree and `./` "
-        "resolves into the consumer's repository; and it cannot interpolate its own ref, so the ref is "
-        "a literal. Internal surface, so that ref moving is not a consumer-visible change"
-    ),
-}
 
 
 def references() -> list[tuple[str, str, str]]:
@@ -34,7 +21,7 @@ def references() -> list[tuple[str, str, str]]:
 def test_every_third_party_reference_is_pinned_to_a_full_sha() -> None:
     unpinned: list[str] = []
     for where, path, uses in references():
-        if uses.startswith(SAME_REPOSITORY) or uses in EXEMPT:
+        if uses.startswith(SAME_REPOSITORY):
             continue
         _, _, ref = uses.partition("@")
         if not SHA.match(ref):
@@ -42,20 +29,11 @@ def test_every_third_party_reference_is_pinned_to_a_full_sha() -> None:
     assert unpinned == [], (
         "reference not pinned to a full commit SHA: "
         + "; ".join(unpinned)
-        + ". Pin it, or name it in EXEMPT with the reason it cannot be"
+        + ". Pin it. Reaching something of this repository's own is `$/`, which needs no ref"
     )
 
 
-def test_every_exemption_carries_a_reason() -> None:
-    assert all(reason.strip() for reason in EXEMPT.values())
-
-
-def test_the_self_reference_exemption_is_the_only_one() -> None:
-    assert len(EXEMPT) <= 1, f"more than one unpinned reference is exempt: {sorted(EXEMPT)}"
-
-
-def test_every_exemption_is_a_self_reference_by_owner_and_moving_ref() -> None:
-    for uses in EXEMPT:
-        slug, _, ref = uses.partition("@")
-        assert slug.startswith(f"{OWNER}/"), f"{uses} is exempt but is not this owner's"
-        assert MOVING_REF.match(ref), f"{uses} is exempt but names {ref!r} rather than a moving ref"
+def test_the_reader_finds_a_reference_it_is_given() -> None:
+    # Pre-flight the walker, or a change that stops it finding anything reports green over a tree of
+    # unpinned actions.
+    assert any(uses.startswith("actions/checkout@") for _, _, uses in references())

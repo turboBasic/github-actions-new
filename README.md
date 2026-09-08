@@ -319,21 +319,13 @@ Which component the boundary falls on is decided in exactly one function in the 
 and a test asserts nothing else decides it. Reading it off the major number alone is wrong below
 `1.0.0`, and wrong in the permissive direction.
 
-### The one SHA-pinning exception
+### Pinning
 
-Third-party actions are pinned to a full commit SHA, with no exceptions. There is exactly one reference
-in this repository that names a ref instead: `release.yml` reaches its own decision unit as
-`turboBasic/github-actions-new/actions/release-decisions@v0.1`.
-
-That is structural rather than a preference. A reusable workflow runs `actions/checkout` against the
-*caller's* tree, so a workspace-relative path resolves into the consumer's repository, and a reusable
-workflow cannot interpolate its own ref — so it can reach neither its own files nor the ref you pinned.
-No arrangement of checkouts removes it. The unit is internal surface, so that ref moving is not a
-change you can observe. `tests/test_action_pins.py` asserts it is the only one, that it is this owner's,
-and that its ref is a moving one; `.github/zizmor.yml` narrows the pinning policy to that path alone.
-
-One consequence worth knowing: the first release of this repository has to be cut by hand, because the
-capability names a ref that does not exist until a release exists.
+Third-party actions are pinned to a full commit SHA, with no exceptions and no mechanism for one — a
+test asserts it over every `uses:` in the tree. Anything of this repository's own is reached with `$/`,
+which GitHub resolves from the repository owning the file rather than from the workspace. That holds even
+inside a reusable workflow running against your checkout, so nothing here needs to name a ref to reach
+its own code, and there is nothing for you to bootstrap.
 
 ## Working in this repository
 
