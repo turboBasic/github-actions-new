@@ -57,6 +57,18 @@ venv = ".venv"
 testpaths = ["tests"]
 addopts = ["-ra"]
 
+# What a consumer of this repository actually resolves, so its release is judged against its own layout
+# rather than an inherited default. The excluded files are this repository's own callers of its
+# capabilities: changing one cannot break anybody, because nobody outside names them.
+[tool.turbobasic-release]
+include = [".github/workflows", "actions"]
+exclude = [
+  ".github/workflows/ci.yml",
+  ".github/workflows/commit-messages.yml",
+  ".github/workflows/release-on-merge.yml",
+  ".github/workflows/release-proposal.yml",
+]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"

@@ -22,6 +22,7 @@ from decisions import (
     increment,
     moving_ref,
     parse_version,
+    range_verdicts,
     read_surface,
     refusals,
     surface_notice,
@@ -291,3 +292,28 @@ def test_a_path_that_is_empty_or_holds_whitespace_or_begins_with_a_hyphen_is_ref
         for key in ["include", "exclude"]:
             refused = read_surface({key: [path]})
             assert isinstance(refused, Refusal), (key, repr(path))
+
+
+def test_a_bang_in_the_subject_is_a_break() -> None:
+    assert range_verdicts(["feat!: drop an input"]) == (True, True)
+    assert range_verdicts(["fix(scope)!: rename a check"]) == (True, False)
+
+
+def test_a_breaking_change_footer_is_a_break() -> None:
+    # Reading only the subject would miss a break its author declared exactly as the grammar says to.
+    assert range_verdicts(["fix: a thing\n\nBREAKING CHANGE: a check was renamed"]) == (True, False)
+    assert range_verdicts(["fix: a thing\n\nBREAKING-CHANGE: a check was renamed"]) == (True, False)
+
+
+def test_a_feature_is_read_from_the_type_alone() -> None:
+    assert range_verdicts(["feat: add an input"]) == (False, True)
+    assert range_verdicts(["feat(ci): add an input"]) == (False, True)
+
+
+def test_neither_verdict_is_reached_by_a_range_holding_neither() -> None:
+    assert range_verdicts(["docs: reword a section", "chore: bump a pin"]) == (False, False)
+    assert range_verdicts([]) == (False, False)
+
+
+def test_one_break_anywhere_in_the_range_counts() -> None:
+    assert range_verdicts(["docs: reword", "refactor!: move a call site"]) == (True, False)

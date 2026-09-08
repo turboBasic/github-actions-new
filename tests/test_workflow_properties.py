@@ -127,6 +127,71 @@ def test_the_changed_files_lint_is_gated_on_the_lint_stage_switch() -> None:
     )
 
 
+# What a step does, read from the command it runs rather than from a list this test also keeps. A step
+# creating a ref names one of these; nothing else in the release path does.
+CREATES_A_REF = ("git/refs", "git/tags", "gh release create")
+
+# Writing a version means authoring a commit. The release path tags what a merged change already
+# decided, so it never authors one — the proposal path is where a version is written.
+WRITES_A_VERSION = ("git commit", "cz bump", "sed -i", "bump-my-version")
+
+
+def release_steps() -> list[Doc]:
+    return steps_of("release", "tag-and-publish")
+
+
+def test_no_ref_creating_step_precedes_the_refusals() -> None:
+    # Principle V's structural gate. A refusal after a tag exists is not a refusal, because a version
+    # tag is immutable and cannot be withdrawn — so ordering is the whole protection.
+    steps = release_steps()
+    decided = next(index for index, step in enumerate(steps) if step.get("id") == "decide")
+    for index, step in enumerate(steps):
+        if any(marker in str(step.get("run", "")) for marker in CREATES_A_REF):
+            assert index > decided, (
+                f"release step {step.get('id')!r} creates a ref at position {index}, before the "
+                f"refusals at {decided}. Every refusal runs before any ref exists or none of them mean "
+                "anything"
+            )
+
+
+def test_every_ref_creating_step_is_gated_on_the_verdict_and_on_the_dry_run() -> None:
+    # `proceed` is not permission to create a ref: a dry run proceeds and creates nothing. Both gates
+    # or a dry run tags for real.
+    found = 0
+    for step in release_steps():
+        if not any(marker in str(step.get("run", "")) for marker in CREATES_A_REF):
+            continue
+        found += 1
+        condition = str(step.get("if", ""))
+        assert "steps.decide.outputs.proceed" in condition, (
+            f"release step {step.get('id')!r} creates a ref under `if: {condition}`, which does not "
+            "read the verdict"
+        )
+        assert "inputs.dry-run" in condition, (
+            f"release step {step.get('id')!r} creates a ref under `if: {condition}`, which does not "
+            "exclude a dry run. A dry run that tags is not a dry run"
+        )
+    assert found >= 3, (
+        f"only {found} ref-creating steps found in release.yml, so this gate is reading the wrong "
+        "thing — the tag, the release and the moving ref are three"
+    )
+
+
+def test_no_step_in_the_release_path_writes_a_version() -> None:
+    # The version released is what a merged change decided, and this capability only tags it. The
+    # proposal path writes versions; this one is gated against ever doing so.
+    offending: list[str] = []
+    for step in release_steps():
+        script = str(step.get("run", ""))
+        offending += [
+            f"{step.get('id')}: {marker}" for marker in WRITES_A_VERSION if marker in script
+        ]
+    assert offending == [], (
+        f"release.yml authors a change: {offending}. It tags what was already decided, and a version "
+        "it wrote itself would be a version no review ever saw"
+    )
+
+
 def test_no_workflow_anywhere_triggers_on_pull_request_target() -> None:
     # It runs with this repository's own token while the pull request's text is a fork's to choose,
     # so a trigger added here hands that token whatever the fork wrote.

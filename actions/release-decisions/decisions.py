@@ -17,6 +17,15 @@ FIRST_STABLE: Version = (1, 0, 0)
 # No leading zero, no pre-release, no build metadata, no leading `v`.
 VERSION = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
+# A break is `type!:` in the subject or a BREAKING CHANGE footer in the body — both are Conventional
+# Commits' own spellings, and reading only the subject would miss a break its author declared properly.
+BREAKING_SUBJECT = re.compile(r"^[a-zA-Z]+(\([^)]*\))?!:")
+BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE:", re.MULTILINE)
+FEATURE_SUBJECT = re.compile(r"^feat(\([^)]*\))?!?:")
+
+# A commit message holds newlines, so messages arrive separated by this rather than by lines.
+RECORD = "\x1e"
+
 NOTICE = "notice"
 ERROR = "error"
 
@@ -98,6 +107,21 @@ def increment(version: Version, breaking: bool, feature: bool) -> Version:
     if feature and line_owns_the_major:
         return (major, minor + 1, 0)
     return (major, minor, patch + 1)
+
+
+def range_verdicts(messages: Iterable[str]) -> tuple[bool, bool]:
+    # The two verdicts the increment and the last refusal both read. Decided here rather than in a
+    # `run:` block because getting either wrong puts a release on the wrong compatibility line, and a
+    # version tag cannot be withdrawn.
+    breaking = False
+    feature = False
+    for message in messages:
+        subject = message.partition("\n")[0]
+        breaking = breaking or bool(
+            BREAKING_SUBJECT.match(subject) or BREAKING_FOOTER.search(message)
+        )
+        feature = feature or bool(FEATURE_SUBJECT.match(subject))
+    return breaking, feature
 
 
 def unusable_path(path: str) -> bool:
@@ -250,8 +274,8 @@ def read_text(name: str) -> str:
     return os.environ.get(name, "")
 
 
-def read_flag(name: str) -> bool:
-    return read_text(name).strip().lower() == "true"
+def read_records(name: str) -> tuple[str, ...]:
+    return tuple(record.strip() for record in read_text(name).split(RECORD) if record.strip())
 
 
 def read_lines(name: str) -> tuple[str, ...]:
@@ -308,7 +332,8 @@ def answer_next_version() -> int:
     if version is None:
         annotate(ERROR, f"release-decisions cannot increment {read_text('VERSION')!r}")
         return 1
-    nxt = increment(version, breaking=read_flag("BREAKING"), feature=read_flag("FEATURE"))
+    breaking, feature = range_verdicts(read_records("COMMIT_MESSAGES"))
+    nxt = increment(version, breaking=breaking, feature=feature)
     emit(version=format_version(nxt), ref=moving_ref(nxt))
     return 0
 
@@ -323,6 +348,7 @@ def answer_release_verdict() -> int:
     notice = surface_notice(surface)
     if notice:
         annotate(NOTICE, notice)
+    breaking, feature = range_verdicts(read_records("COMMIT_MESSAGES"))
     request = Request(
         version_text=read_text("VERSION").strip(),
         branch=read_text("BRANCH").strip(),
@@ -330,8 +356,8 @@ def answer_release_verdict() -> int:
         occasion=read_text("OCCASION").strip() or DELIBERATE,
         existing=read_released_versions("RELEASED_VERSIONS"),
         notes=read_text("NOTES"),
-        breaking=read_flag("BREAKING"),
-        feature=read_flag("FEATURE"),
+        breaking=breaking,
+        feature=feature,
         changed_paths=read_lines("CHANGED_PATHS"),
         surface=surface,
     )

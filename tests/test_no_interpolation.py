@@ -1,6 +1,7 @@
 import re
+from typing import Any, cast
 
-from capabilities import every_yaml, values_at
+from capabilities import Doc, every_yaml, values_at
 
 # Every context whose value is chosen outside this repository, with why. An injection here runs with
 # whatever token the job holds, and a token that has been used cannot be un-used. These reach the
@@ -55,3 +56,56 @@ def test_the_gate_reads_an_interpolation_it_is_given() -> None:
     assert offences("github.workflow") == []
     assert offences("env.LINT_TASK") == []
     assert contexts("mise run ${{ inputs.lint-task }}\n") == ["inputs.lint-task"]
+
+
+def strings(node: Any, path: str = "") -> list[tuple[str, str]]:
+    # Every string anywhere, with where it was found. `values_at` names one key; a secret has to be
+    # looked for in all of them, since the whole question is which key it reached.
+    if isinstance(node, dict):
+        found: list[tuple[str, str]] = []
+        for key, value in cast(dict[Any, Any], node).items():
+            found += strings(value, f"{path}.{key}" if path else str(key))
+        return found
+    if isinstance(node, list):
+        return [
+            pair
+            for index, value in enumerate(cast(list[Any], node))
+            for pair in strings(value, f"{path}[{index}]")
+        ]
+    return [(path, node)] if isinstance(node, str) else []
+
+
+def test_no_secret_reaches_anything_but_a_step_input() -> None:
+    # A token that has been written to a file, a log or an artifact cannot be un-written, and the whole
+    # point of minting a narrowed one is that it never leaves the step that mints it. `with:` is the
+    # only place a secret belongs: the action reads it, and nothing else sees it.
+    escaped: list[str] = []
+    for where, doc in every_yaml():
+        for path, value in strings(doc):
+            for expression in contexts(value):
+                if "secrets." in expression and ".with." not in f"{path}.":
+                    escaped.append(f"{where} at {path}: ${{{{ {expression} }}}}")
+    assert escaped == [], (
+        "a secret reaches something other than a step's `with:` block: "
+        + "; ".join(escaped)
+        + ". Mint a narrowed token and hand it to the action that needs it; a token that has been used "
+        "cannot be un-used"
+    )
+
+
+def test_the_secret_gate_reads_a_secret_it_is_given() -> None:
+    doc: Doc = {"jobs": {"j": {"steps": [{"run": "echo ${{ secrets.TOKEN }}"}]}}}
+    leaked = [
+        path
+        for path, value in strings(doc)
+        for expression in contexts(value)
+        if "secrets." in expression and ".with." not in f"{path}."
+    ]
+    assert leaked == ["jobs.j.steps[0].run"]
+    allowed: Doc = {"jobs": {"j": {"steps": [{"with": {"key": "${{ secrets.TOKEN }}"}}]}}}
+    assert [
+        path
+        for path, value in strings(allowed)
+        for expression in contexts(value)
+        if "secrets." in expression and ".with." not in f"{path}."
+    ] == []

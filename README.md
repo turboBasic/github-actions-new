@@ -118,7 +118,70 @@ Not shipped yet.
 
 ### `release`
 
-Not shipped yet.
+Tags the version your manifest already declares, publishes the release from notes rendered out of the
+commit range, and moves the compatibility ref last. It never decides a version and never writes one:
+what gets released is what a merged change put in `pyproject.toml`.
+
+It has **no trigger of its own**. A caller's dependency edge is the only route to it, which is what
+keeps anything from reaching the tagging step around a verdict.
+
+```yaml
+name: release-on-merge
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        type: boolean
+        default: true
+
+jobs:
+  verify:
+    permissions:
+      contents: read
+    uses: your-org/your-repo/.github/workflows/ci.yml@v1
+
+  release:
+    needs: verify
+    permissions:
+      contents: write
+    uses: turboBasic/github-actions-new/.github/workflows/release.yml@v0.1
+    with:
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+```
+
+Required context: `release / tag-and-publish`.
+
+**Dry-run it before you trust it with a tag.** Every refusal runs, the real notes render, and nothing
+is created. This is the only safe way to exercise the capability, because a version tag is immutable
+once published — a wrong one cannot be deleted, only lived with.
+
+It refuses, always before any ref exists, when the run is not on your repository's own default branch;
+when the declared version is not a plain `N.N.N`; when that version is not ahead of the highest release
+across *every* compatibility line; when the range renders no notes; or when the range breaks your
+consumer surface while the version stays on a line that already has a release. A routine merge that
+simply did not bump the version declines with a notice instead of failing — your default branch should
+not redden for doing nothing wrong.
+
+Prerequisites in the calling repository: `git-cliff` pinned in `mise.toml`, a `cliff.toml` mapping
+commit types to sections, a `[project].version` in `pyproject.toml`, and the surface declaration below.
+Notes come from commit types, never from a label on a pull request: a label is applied after the fact by
+whoever is looking, and two people label differently.
+
+Declare what a consumer of *you* actually resolves, so your release is judged against your own layout
+rather than a default that fits somebody else's:
+
+```toml
+[tool.turbobasic-release]
+include = [".github/workflows", "actions"]
+exclude = [".github/workflows/ci.yml"]
+```
+
+Omit it and every changed path counts towards a break — refusing more often rather than less, and said
+out loud in the log. A misspelled key is refused rather than read as an absent one, because silently
+widening the surface while looking configured is the failure nobody would notice.
 
 ### `prek-advisory`
 
@@ -126,9 +189,40 @@ Not shipped yet.
 
 ## Versioning
 
-Not shipped yet. What is already settled: this repository starts its own version line and inherits no
-ref from the one it supersedes, so adopting it is one deliberate migration — repin the call site and
-re-check the required contexts, once.
+This repository starts its own version line and inherits no ref from the one it supersedes. Adopting it
+is one deliberate migration: repin the call site and re-check the required contexts, once. No old pin is
+promised to keep resolving.
+
+Pin the moving ref. It is force-moved to each release, last, after the release exists:
+
+| While the version is | Pin | Because |
+| --- | --- | --- |
+| below `1.0.0` | `v0.1`, `v0.2`, … | below `1.0.0` a break is signalled by the minor, so a ref spanning the minor is the one that never crosses one |
+| `1.0.0` and above | `v1`, `v2`, … | above it a break is signalled by the major |
+
+`v0` is never published. It would span every pre-1.0 break at once, which is the one thing a moving ref
+exists to prevent. Exact release tags are immutable, so pin one of those instead if you want no
+movement at all.
+
+Which component the boundary falls on is decided in exactly one function in the release decision unit,
+and a test asserts nothing else decides it. Reading it off the major number alone is wrong below
+`1.0.0`, and wrong in the permissive direction.
+
+### The one SHA-pinning exception
+
+Third-party actions are pinned to a full commit SHA, with no exceptions. There is exactly one reference
+in this repository that names a ref instead: `release.yml` reaches its own decision unit as
+`turboBasic/github-actions-new/actions/release-decisions@v0.1`.
+
+That is structural rather than a preference. A reusable workflow runs `actions/checkout` against the
+*caller's* tree, so a workspace-relative path resolves into the consumer's repository, and a reusable
+workflow cannot interpolate its own ref — so it can reach neither its own files nor the ref you pinned.
+No arrangement of checkouts removes it. The unit is internal surface, so that ref moving is not a
+change you can observe. `tests/test_action_pins.py` asserts it is the only one, that it is this owner's,
+and that its ref is a moving one; `.github/zizmor.yml` narrows the pinning policy to that path alone.
+
+One consequence worth knowing: the first release of this repository has to be cut by hand, because the
+capability names a ref that does not exist until a release exists.
 
 ## Working in this repository
 

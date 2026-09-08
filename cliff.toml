@@ -1,0 +1,38 @@
+# What a release's notes say, and where they come from: the commit types in the range, never a label
+# on a pull request. A label is applied after the fact by whoever is looking, and two people label
+# differently; a commit type was chosen by the person who made the change and is already gated.
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}{% if commit.breaking %} — **breaking**{% endif %}
+{%- endfor %}
+{% endfor %}"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+# A commit that is not conventional cannot be in the range: both grammar checks are required gates, so
+# one arriving here means a gate was bypassed rather than that the notes should paper over it.
+filter_unconventional = true
+filter_commits = true
+protect_breaking_commits = true
+# Version tags only. A moving ref is a tag too, and matching one would start the range at whatever the
+# last release moved it to rather than at the last release.
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^revert", group = "Reverted" },
+  { message = "^docs", group = "Documentation" },
+  # Nothing a consumer resolving a ref can observe. A range holding only these renders no notes, and
+  # the release is refused for having nothing to publish — which is the right answer, not a gap.
+  { message = "^(build|bump|chore|ci|style|test)", skip = true },
+]

@@ -15,7 +15,13 @@ MOVING_REF = re.compile(r"^v\d+(\.\d+)?$")
 # workflow runs its checkout against the caller's tree and cannot interpolate its own ref — so it can
 # reach neither its own files nor the ref the consumer pinned. Nothing here is a preference, and
 # nothing else earns it.
-EXEMPT: dict[str, str] = {}
+EXEMPT: dict[str, str] = {
+    "turboBasic/github-actions-new/actions/release-decisions@v0.1": (
+        "the release capability is a reusable workflow, so its checkout is the caller's tree and `./` "
+        "resolves into the consumer's repository; and it cannot interpolate its own ref, so the ref is "
+        "a literal. Internal surface, so that ref moving is not a consumer-visible change"
+    ),
+}
 
 
 def references() -> list[tuple[str, str, str]]:

@@ -35,14 +35,13 @@ inputs:
     description: The rendered notes for the range. Empty means there is nothing to publish.
     required: false
     default: ""
-  breaking:
-    description: Whether the range holds a breaking change.
+  commit-messages:
+    description: >-
+      Every commit message in the range, separated by an ASCII record separator because a message holds
+      newlines. Whether the range breaks anything and whether it holds a feature are read from these,
+      not passed in as flags — getting either wrong puts a release on the wrong compatibility line.
     required: false
-    default: "false"
-  feature:
-    description: Whether the range holds a feature.
-    required: false
-    default: "false"
+    default: ""
   changed-paths:
     description: Every path the range touches, one per line. Filtered by the surface declaration.
     required: false
@@ -87,8 +86,7 @@ runs:
         OCCASION: ${{ inputs.occasion }}
         RELEASED_VERSIONS: ${{ inputs.released-versions }}
         NOTES: ${{ inputs.notes }}
-        BREAKING: ${{ inputs.breaking }}
-        FEATURE: ${{ inputs.feature }}
+        COMMIT_MESSAGES: ${{ inputs.commit-messages }}
         CHANGED_PATHS: ${{ inputs.changed-paths }}
         MANIFEST: ${{ inputs.manifest }}
       run: python3 "$GITHUB_ACTION_PATH/decisions.py"

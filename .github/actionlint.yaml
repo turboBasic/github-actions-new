@@ -17,3 +17,4 @@ paths:
   .github/workflows/**/*.yml:
     ignore:
       - 'reusable workflow call "\$/'
+      - 'specifying action "\$/'

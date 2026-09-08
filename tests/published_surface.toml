@@ -67,6 +67,18 @@ jobs = ["pr-title", "commit-messages"]
 event = "any event but pull_request"
 reason = "there is no title and no range to judge; a consumer must not require these contexts for another event"
 
+[release]
+kind = "workflow"
+published = true
+check_name = ["tag-and-publish"]
+inputs = ["dry-run"]
+# The only write in the published set, and the reason this capability is separate from every other.
+permissions = { contents = "write" }
+tool_prerequisites = [
+  "git-cliff — the notes renderer, invoked to render the range",
+]
+skips_under = []
+
 [release-decisions]
 kind = "action"
 # Internal surface: no stability promise, no check name, and inputs nothing outside this repository

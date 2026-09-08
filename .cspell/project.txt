@@ -33,6 +33,8 @@ stdlib
 
 # --- Config keys ---
 addopts
+# git-cliff renders its notes with a Tera template
+endfor
 conftest
 testpaths
 
