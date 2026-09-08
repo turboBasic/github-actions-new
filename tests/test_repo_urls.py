@@ -18,6 +18,15 @@ EXEMPT: dict[str, str] = {
 }
 
 
+# A `uses:` slug is a resolvable reference just like a URL, and GitHub redirects a renamed
+# repository's refs too — so a stale one keeps working and nothing announces the drift. The README is
+# not exempt here: its call sites have to resolve, unlike the prose that deliberately names both
+# repositories.
+USES_SLUG = re.compile(r"uses:\s*(turboBasic/[A-Za-z0-9._-]+)")
+
+OWN_PATH = "tests/test_repo_urls.py"
+
+
 def current_slug() -> str:
     url = subprocess.run(
         ["git", "-C", str(REPO), "remote", "get-url", "origin"],
@@ -51,3 +60,28 @@ def test_every_self_url_names_the_repository_this_clone_actually_is() -> None:
 
 def test_every_exemption_carries_a_reason() -> None:
     assert all(reason.strip() for reason in EXEMPT.values())
+
+
+def test_every_self_reference_by_slug_names_the_repository_this_clone_is() -> None:
+    slug = current_slug()
+    stale: list[str] = []
+    for path in tracked_files():
+        # This module owns the matcher, so it carries deliberate counter-examples that are meant not to
+        # be this repository — scanning itself would report its own pre-flight as drift.
+        if path.startswith((".specify/", ".claude/skills/speckit-")) or path == OWN_PATH:
+            continue
+        text = (REPO / path).read_text(encoding="utf-8", errors="ignore")
+        stale += [f"{path}: {found}" for found in USES_SLUG.findall(text) if found != slug]
+    assert stale == [], (
+        f"`uses:` names a repository other than {slug}: {stale}. A rename leaves the old slug "
+        "resolving through GitHub's redirect, so nothing else would report this"
+    )
+
+
+def test_the_slug_reader_finds_a_reference_it_is_given() -> None:
+    # Pre-flight the matcher, or a change that stops it matching reports green over stale slugs.
+    assert USES_SLUG.findall("uses: turboBasic/github-actions/x.yml@v1") == [
+        "turboBasic/github-actions"
+    ]
+    assert USES_SLUG.findall("    uses:  turboBasic/other-repo\n") == ["turboBasic/other-repo"]
+    assert USES_SLUG.findall("uses: ./.github/workflows/x.yml") == []

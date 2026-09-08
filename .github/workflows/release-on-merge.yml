@@ -1,0 +1,38 @@
+name: release-on-merge
+
+# The dispatch entry point exists to dry-run: every refusal runs and the real notes render, and nothing
+# is created. It is the only safe way to exercise the release path, since a version tag cannot be
+# withdrawn once pushed.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Run every refusal and render the notes, then stop before creating anything.
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  # The verdict has to be structurally true of the commit being tagged, which only a dependency edge
+  # gives. A separate workflow reporting green earlier says nothing about this commit.
+  verify:
+    permissions:
+      contents: read # the capability checks this tree out; no step it runs writes anywhere
+    uses: $/.github/workflows/python-ci.yml
+
+  release:
+    needs: verify
+    permissions:
+      contents: write # the version tag, the release, and the moving compatibility ref
+    uses: $/.github/workflows/release.yml
+    with:
+      # A push is never a dry run and a dispatch defaults to one, so the destructive path is the one
+      # that has to be asked for.
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}

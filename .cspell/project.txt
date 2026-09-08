@@ -28,11 +28,15 @@ zizmorcore
 
 # --- Library and API identifiers ---
 pyupgrade
+rawfile
 schemafile
 stdlib
 
 # --- Config keys ---
 addopts
+# git-cliff renders its notes with a Tera template
+endfor
+conftest
 testpaths
 
 # --- Repository jargon ---

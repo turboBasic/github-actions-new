@@ -3,6 +3,10 @@ The title is a Conventional Commit — a squash merge takes its subject from the
 Everything below renders as prose; these hints disappear.
 -->
 
+## What changed
+
+<!-- pr-description:summary -->
+
 ## Why?
 
 <!--
@@ -28,3 +32,7 @@ What you ran, and what you saw.
 <!--
 What documentation you touched, or `none — no doc describes this`.
 -->
+
+## Commits
+
+<!-- pr-description:changes -->

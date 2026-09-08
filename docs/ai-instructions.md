@@ -4,9 +4,10 @@ The conventions layer: how work is done here, binding humans and AI coding tools
 Copilot) alike. The invariants are a layer above and are cited here by principle number; the entry
 point says where every kind of instruction lives.
 
-Scope: reusable GitHub Actions workflows and composite actions consumed by other `turboBasic`
-repositories. This repo ships no application. Its Python exists to support the actions and to assert
-properties of the YAML.
+Scope: reusable GitHub Actions workflows consumed by other `turboBasic` repositories, plus the one
+internal composite action a capability depends on — nothing here is published as an action. This
+repository ships no application. Its Python exists to support the actions and to assert properties of
+the YAML.
 
 Committed configuration is authoritative for settings it already declares: read it rather than
 assuming, extend it, and never regenerate it. The entry point names which file holds what.
@@ -99,6 +100,22 @@ same linters.
 
 ## Code
 
+### Capabilities
+
+The workflows and actions a consumer calls. Each rule below was held against the invariants layer's
+admission bar and is a convention rather than a principle: a reviewer catches the breach and a revert
+restores the world.
+
+- **A failure names what to change.** What was read, what it was compared against, and what a
+  maintainer should do about it. An exit code on its own is not a result.
+- **A tool the consumer's configuration must pin is checked before it is invoked**, and the failure
+  names the tool, the capability that needs it, and where the consumer declares it. `command not found`
+  is not a contract.
+- **A tool the consumer invokes stays the consumer's to pin.** A capability never pins a version the
+  consumer does not control — that agreement is the only reason a local verdict and a CI verdict match.
+- **An input named for a stage governs that stage entirely.** If it leaves some part of the stage
+  running, it is misnamed.
+
 ### Python
 
 Python 3.14. The only Python here supports the actions and their tests.
@@ -146,3 +163,13 @@ Python 3.14. The only Python here supports the actions and their tests.
 ### CI
 
 `mise run ci` reproduces CI locally.
+
+**This repository's own branch ruleset is a consumer of its own check names, and nothing in the tree can
+see it.** Renaming a job, removing one, or making a job conditional changes what reports — so the same
+change edits the ruleset's required contexts. The rule is principle IV's, and the README already states
+it for consumers; it binds here too, and forgetting it is not a small mistake. A required context that
+no longer reports blocks every pull request in this repository, and the only symptom is a check that
+never appears.
+
+Two names are never required: `advisory / prek-advisory`, which is advertised as advisory and reports
+green whether or not it found anything, and any context from a capability whose job can skip.

@@ -15,5 +15,4 @@ work becomes an issue and the row goes.
 
 | ID | What | Condition that clears it |
 | --- | --- | --- |
-
-<!-- No entries. The table stays, so the first one has a shape to land in. -->
+| TD-001 | `.github/actionlint.yaml` ignores two actionlint messages, because actionlint rejects the `$/` same-repository form that GitHub recommends and zizmor's `self-repository` audit demands — once for a reusable workflow call and once for an action reference. Two gates contradict each other and the stale verdict is the one silenced | `actionlint --version` reports a release that accepts `uses: $/.github/workflows/x.yml` and `uses: $/actions/x`. Delete the `paths:` entry and the file with it |

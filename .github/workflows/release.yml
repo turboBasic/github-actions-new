@@ -1,0 +1,153 @@
+name: release
+
+# `workflow_call` and nothing else. A caller's dependency edge is the only route here, which is what
+# keeps anything from reaching the tagging step around that edge — there is no event to arrive on.
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        description: >-
+          Run every refusal and render the real notes, then stop before creating anything. The only
+          safe way to exercise this capability, because a version tag cannot be withdrawn once pushed.
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  tag-and-publish:
+    name: tag-and-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Serialised, and never cancelled. Two releases racing would both force-move the same ref, and
+    # whichever lost would leave consumers pinned to a release that was never the latest.
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # the version tag, the release, and the moving compatibility ref
+    steps:
+      # Full history and every tag: the range starts at the last release, and the refusals compare
+      # against every release across every line.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # `minimum_release_age` rather than a pinned version: a task-runner release whose tag exists
+      # before its assets do breaks every consumer at once, and waiting a day for one costs nothing.
+      # A pinned version would go stale; this does not.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          minimum_release_age: 24h
+
+      - name: Pre-flight the notes renderer
+        run: |
+          command -v git-cliff >/dev/null 2>&1 || {
+            echo "::error::release looked for git-cliff on PATH after installing this repository's pinned tools, and did not find it. Add git-cliff to the [tools] table in mise.toml and commit the change; release never pins a version the repository being released does not control." >&2
+            exit 1
+          }
+
+      # Everything the refusals read, and the real notes, gathered before anything exists. The default
+      # branch is read from the repository itself rather than compared against a literal name: a
+      # literal is right for one repository by coincidence and wrong for the next in silence.
+      - id: gather
+        name: Read the range and render its notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DELIMITER: __RELEASE_GATHER__
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          default_branch=$(gh api "repos/$GH_REPO" --jq .default_branch)
+          git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' > "$RUNNER_TEMP/releases" || true
+          last=$(head -1 "$RUNNER_TEMP/releases" || true)
+          if [ -n "$last" ]; then span=("$last..HEAD"); else span=(HEAD); fi
+          git log --format= --name-only "${span[@]}" | sort -u | grep -v '^$' > "$RUNNER_TEMP/paths" || true
+          git log --format=%B%x1e "${span[@]}" > "$RUNNER_TEMP/messages"
+          git-cliff --config cliff.toml --unreleased > "$RUNNER_TEMP/notes.md"
+          {
+            printf 'version=%s\n' "$version"
+            printf 'default-branch=%s\n' "$default_branch"
+            for name in releases paths messages; do
+              printf '%s<<%s\n' "$name" "$DELIMITER"
+              cat "$RUNNER_TEMP/$name"
+              printf '%s\n' "$DELIMITER"
+            done
+            printf 'notes<<%s\n' "$DELIMITER"
+            cat "$RUNNER_TEMP/notes.md"
+            printf '%s\n' "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+      # The one reference in this repository named by owner and moving ref rather than pinned to a
+      # SHA. A reusable workflow runs its checkout against the caller's tree and cannot interpolate its
+      # own ref, so it can reach neither its own files nor the ref the consumer pinned. See README.
+      - id: decide
+        name: Run every refusal, before any ref exists
+        uses: turboBasic/github-actions-new/actions/release-decisions@v0.1
+        with:
+          decision: release-verdict
+          version: ${{ steps.gather.outputs.version }}
+          branch: ${{ github.ref_name }}
+          default-branch: ${{ steps.gather.outputs.default-branch }}
+          occasion: ${{ inputs.dry-run && 'dry-run' || (github.event_name == 'push' && 'routine' || 'deliberate') }}
+          released-versions: ${{ steps.gather.outputs.releases }}
+          notes: ${{ steps.gather.outputs.notes }}
+          commit-messages: ${{ steps.gather.outputs.messages }}
+          changed-paths: ${{ steps.gather.outputs.paths }}
+          manifest: pyproject.toml
+
+      - name: Report what a dry run would have done
+        if: inputs.dry-run
+        env:
+          VERDICT: ${{ steps.decide.outputs.message }}
+          VERSION: ${{ steps.gather.outputs.version }}
+          MOVING_REF: ${{ steps.decide.outputs.ref }}
+        run: |
+          {
+            printf '## Dry run — nothing was created\n\n'
+            printf 'Would tag v%s and move %s.\n\n' "$VERSION" "$MOVING_REF"
+            printf '%s\n\n' "$VERDICT"
+            printf '### The notes it would publish\n\n'
+            cat "$RUNNER_TEMP/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # An annotated tag object, then the ref that names it. Created once and never force-updated: this
+      # is the ref a consumer may pin exactly, and it cannot be withdrawn.
+      - id: tag
+        name: Create the annotated version tag
+        if: steps.decide.outputs.proceed == 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.gather.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          tag_sha=$(gh api "repos/$GH_REPO/git/tags" \
+            -f "tag=v$VERSION" -f "message=v$VERSION" -f "object=$COMMIT" -f type=commit --jq .sha)
+          gh api "repos/$GH_REPO/git/refs" -f "ref=refs/tags/v$VERSION" -f "sha=$tag_sha"
+
+      - id: publish
+        name: Publish the release from the rendered notes
+        if: steps.decide.outputs.proceed == 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.gather.outputs.version }}
+        run: |
+          gh release create "v$VERSION" --title "v$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+
+      - id: move-ref
+        name: Force-move the compatibility ref, last
+        if: steps.decide.outputs.proceed == 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          MOVING_REF: ${{ steps.decide.outputs.ref }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          # Last, and only once the release exists. A failure before this leaves consumers on the
+          # previous release rather than on a ref pointing at a release nobody published.
+          gh api -X PATCH "repos/$GH_REPO/git/refs/tags/$MOVING_REF" -F force=true -f "sha=$COMMIT" \
+            || gh api "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$MOVING_REF" -f "sha=$COMMIT"

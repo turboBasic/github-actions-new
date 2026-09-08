@@ -635,6 +635,7 @@ dev = [
     { name = "commitizen" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "yamllint" },
 ]
@@ -647,6 +648,7 @@ dev = [
     { name = "commitizen", specifier = ">=4.17" },
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8.3" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.9" },
     { name = "yamllint", specifier = ">=1.35" },
 ]

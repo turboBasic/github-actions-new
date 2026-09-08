@@ -1,0 +1,23 @@
+name: commit-messages
+
+# `edited` is not in the default activity set, and a corrected title is an edit rather than a push —
+# without it a fixed title leaves the old verdict standing with nothing to re-run it.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# The caller owns concurrency; this workflow has triggers of its own, so it is its own caller.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  # The job id is the first half of both required contexts: `commits / pr-title` and
+  # `commits / commit-messages`.
+  commits:
+    permissions:
+      contents: read # the range check checks this tree out
+      pull-requests: read # the title check reads the title from the API
+    uses: $/.github/workflows/conventional-commits.yml

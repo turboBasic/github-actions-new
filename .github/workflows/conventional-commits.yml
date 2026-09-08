@@ -1,0 +1,143 @@
+name: conventional-commits
+
+on:
+  workflow_call:
+    inputs:
+      check-title:
+        description: >-
+          Judge the pull request title. Switching it off skips the job, and a skipped job reports
+          success — so retire `pr-title` from the required checks in the same change.
+        type: boolean
+        default: true
+      check-commits:
+        description: >-
+          Judge every commit message in the pull request range. Switching it off skips the job, so
+          retire `commit-messages` from the required checks in the same change.
+        type: boolean
+        default: true
+      types:
+        description: >-
+          Newline-separated types, and the only thing either check judges against. Never read from a
+          calling repository's own commit-tool configuration, because that is what would let the two
+          checks reach different verdicts about one word. A default of commitizen's own set, so a
+          message the local commit hook accepts cannot fail here.
+        type: string
+        default: |
+          build
+          bump
+          chore
+          ci
+          docs
+          feat
+          fix
+          perf
+          refactor
+          revert
+          style
+          test
+      timeout-minutes:
+        description: How long either job may run before it is cancelled.
+        type: number
+        default: 5
+
+permissions:
+  contents: read # the range check reads it from git, so it checks the tree out
+  pull-requests: read # the title check reads the title from the API, which needs this at both levels
+
+env:
+  # The three facts both jobs share, and the only place any of them is written. Two check names mean
+  # two jobs; neither can `needs:` the other without making one check's verdict wait on the other's,
+  # and a reusable workflow cannot reach a script in its own tree — so the step below repeats in both
+  # jobs while what it reads does not.
+  CZ_VERSION: "4.18.0"
+  TYPE_PATTERN: "^[a-zA-Z][a-zA-Z0-9]*$"
+  CZ_CONFIG: |
+    [tool.commitizen]
+    name = "cz_customize"
+
+    [tool.commitizen.customize]
+    schema_pattern = '(?s)(TYPES_HERE)(\(\S+\))?!?: ([^\n\r]+)((\n\n.*)|(\s*))?$'
+
+jobs:
+  pr-title:
+    name: pr-title
+    # A skipped job reports success, so this pair is registered in the surface fixture's skip table
+    # with the reason. Pinning the event also puts `pull_request_target` structurally out of reach:
+    # it would run with this repository's token against a fork's text.
+    if: inputs.check-title && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read # nothing is checked out here, but the grant is what the workflow-level block asks of the caller
+      pull-requests: read # the title is read from the API rather than the payload
+    steps:
+      - name: Provision the commit tool
+        run: pipx install "commitizen==$CZ_VERSION"
+
+      - name: Compile the type list into the grammar this check judges against
+        env:
+          TYPES: ${{ inputs.types }}
+        run: |
+          printf '%s\n' "$TYPES" | grep -vE '^[[:space:]]*$' > "$RUNNER_TEMP/types" || true
+          if ! [ -s "$RUNNER_TEMP/types" ] || grep -qvE "$TYPE_PATTERN" "$RUNNER_TEMP/types"; then
+            echo "::error::conventional-commits read the types input as [$TYPES] and will not compile it. Every type is a bare word — letters and digits, starting with a letter — one per line. A comma-separated or quoted list looks accepted and matches nothing. Fix the types input at the call site." >&2
+            exit 1
+          fi
+          # Safe to substitute only because every line above is a bare word: the grammar is a regex,
+          # and an unvalidated entry would be pattern rather than data.
+          alternation=$(paste -sd'|' "$RUNNER_TEMP/types")
+          printf '%s' "${CZ_CONFIG//TYPES_HERE/$alternation}" > "$RUNNER_TEMP/cz.toml"
+
+      - name: Read the pull request title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr view "$PR_NUMBER" --json title --jq .title > "$RUNNER_TEMP/title"
+
+      - name: Judge the title
+        run: |
+          if ! cz --config "$RUNNER_TEMP/cz.toml" check --commit-msg-file "$RUNNER_TEMP/title"; then
+            echo "::error::The pull request title does not match the grammar this repository is held to. It read: $(cat "$RUNNER_TEMP/title"). Expected <type>[optional scope][!]: <subject>, where <type> is one of: $(paste -sd', ' "$RUNNER_TEMP/types"). Edit the title — this check subscribes to edits, so it re-runs by itself." >&2
+            exit 1
+          fi
+
+  commit-messages:
+    name: commit-messages
+    if: inputs.check-commits && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read # the full-history checkout below, so the range can be read from git
+    steps:
+      # Full history: the range is the base commit to the head commit, and a shallow clone has
+      # neither end of it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Provision the commit tool
+        run: pipx install "commitizen==$CZ_VERSION"
+
+      - name: Compile the type list into the grammar this check judges against
+        env:
+          TYPES: ${{ inputs.types }}
+        run: |
+          printf '%s\n' "$TYPES" | grep -vE '^[[:space:]]*$' > "$RUNNER_TEMP/types" || true
+          if ! [ -s "$RUNNER_TEMP/types" ] || grep -qvE "$TYPE_PATTERN" "$RUNNER_TEMP/types"; then
+            echo "::error::conventional-commits read the types input as [$TYPES] and will not compile it. Every type is a bare word — letters and digits, starting with a letter — one per line. A comma-separated or quoted list looks accepted and matches nothing. Fix the types input at the call site." >&2
+            exit 1
+          fi
+          alternation=$(paste -sd'|' "$RUNNER_TEMP/types")
+          printf '%s' "${CZ_CONFIG//TYPES_HERE/$alternation}" > "$RUNNER_TEMP/cz.toml"
+
+      - name: Judge every commit in the range
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! cz --config "$RUNNER_TEMP/cz.toml" check --rev-range "$BASE_SHA..$HEAD_SHA"; then
+            echo "::error::A commit message in this pull request's range does not match the grammar this repository is held to, and the failure above names which. Expected <type>[optional scope][!]: <subject>, where <type> is one of: $(paste -sd', ' "$RUNNER_TEMP/types"). Reword it and force-push, or squash on merge." >&2
+            exit 1
+          fi

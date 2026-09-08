@@ -1,0 +1,199 @@
+name: release-proposal
+
+# Releasing this repository is an act of approval: after a merge, the next version and the exact notes
+# it would publish arrive as a pull request, and merging that is what releases. Nothing here creates a
+# tag — it only proposes the version a later release reads from the manifest.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  PROPOSAL_BRANCH: release/next
+  # The automation's own record of what it last computed, carried in the pull request body. A version on
+  # the branch that differs from this was put there by a person, and a person outranks the computation.
+  MARKER: release-proposal:computed=
+
+jobs:
+  propose:
+    name: propose
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Nothing here uses the run's own token. It cannot open a pull request unless the repository allows
+    # its own automation to, and that is a repository-wide loosening bought for one job's convenience.
+    # Every write below goes through an App installation token narrowed to exactly two scopes.
+    permissions:
+      contents: read # the checkout and the range; every write goes through the App token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # `minimum_release_age` rather than a pinned version: a task-runner release whose tag exists
+      # before its assets do breaks every consumer at once, and waiting a day for one costs nothing.
+      # A pinned version would go stale; this does not.
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          minimum_release_age: 24h
+
+      - id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write # the proposal branch and the version on it
+          permission-pull-requests: write # opening, refreshing and closing the proposal itself
+
+      - id: gather
+        name: Read the range since the last release
+        env:
+          DELIMITER: __PROPOSAL_GATHER__
+        run: |
+          released=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' > "$RUNNER_TEMP/releases" || true
+          last=$(head -1 "$RUNNER_TEMP/releases" || true)
+          if [ -n "$last" ]; then span=("$last..HEAD"); else span=(HEAD); fi
+          git log --format=%B%x1e "${span[@]}" > "$RUNNER_TEMP/messages"
+          git-cliff --config cliff.toml --unreleased > "$RUNNER_TEMP/notes.md"
+          printf 'released=%s\n' "$released" >> "$GITHUB_OUTPUT"
+          {
+            printf 'messages<<%s\n' "$DELIMITER"
+            cat "$RUNNER_TEMP/messages"
+            printf '%s\n' "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+      # This repository's own tree, so the decision unit is reached by path. Only the reusable
+      # capability has to name it by ref, and only because it runs against a caller's checkout.
+      - id: next
+        uses: $/actions/release-decisions
+        with:
+          decision: next-version
+          version: ${{ steps.gather.outputs.released }}
+          commit-messages: ${{ steps.gather.outputs.messages }}
+
+      # An empty range means the last release already covers the default branch, so a standing proposal
+      # is stale rather than pending.
+      - id: close
+        name: Close a proposal whose range has become empty
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          empty=false
+          [ -s "$RUNNER_TEMP/notes.md" ] && [ -n "$(tr -d '[:space:]' < "$RUNNER_TEMP/notes.md")" ] || empty=true
+          printf 'empty=%s\n' "$empty" >> "$GITHUB_OUTPUT"
+          [ "$empty" = true ] || exit 0
+          number=$(gh pr list --head "$PROPOSAL_BRANCH" --state open --json number --jq '.[0].number // ""')
+          if [ -n "$number" ]; then
+            gh pr close "$number" --delete-branch \
+              --comment "The range this proposed is now empty, so there is nothing left to release."
+          fi
+          echo "::notice::the range renders no notes, so no release is proposed"
+
+      - name: Settle which version the proposal carries
+        id: version
+        if: steps.close.outputs.empty != 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          COMPUTED: ${{ steps.next.outputs.version }}
+        run: |
+          version="$COMPUTED"
+          number=$(gh pr list --head "$PROPOSAL_BRANCH" --state open --json number --jq '.[0].number // ""')
+          if [ -n "$number" ]; then
+            previous=$(gh pr view "$number" --json body --jq .body \
+              | sed -n "s/.*${MARKER}\([0-9.]*\).*/\1/p" | head -1)
+            on_branch=$(git show "origin/$PROPOSAL_BRANCH:pyproject.toml" 2>/dev/null \
+              | python3 -c 'import sys,tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])' \
+              || true)
+            # The two disagree only if a person edited the version, so their answer survives the refresh.
+            if [ -n "$previous" ] && [ -n "$on_branch" ] && [ "$on_branch" != "$previous" ]; then
+              version="$on_branch"
+              echo "::notice::keeping $version from the proposal branch — this last computed $previous, so a person chose the difference"
+            fi
+          fi
+          printf 'number=%s\n' "$number" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      # One commit carrying the manifest and the lockfile together. The lockfile records the project's
+      # own version, so moving the manifest without it leaves `uv sync --locked` failing on the proposal
+      # branch — which reddens every check on the very pull request whose merge is meant to release. Two
+      # writes would also push a transiently broken state and fire a run against it.
+      #
+      # Built through the git data API rather than pushed: a token in a remote URL would be a secret on a
+      # command line, and a persisted credential would be one in a file.
+      - name: Put the version on the proposal branch
+        if: steps.close.outputs.empty != 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          bumped = re.sub(
+              r'(?m)^version = ".*"$', f'version = "{os.environ["VERSION"]}"', text, count=1
+          )
+          path.write_text(bumped, encoding="utf-8")
+          PY
+          uv lock
+
+          blob() {
+            jq -n --arg content "$(base64 -w0 < "$1")" '{content: $content, encoding: "base64"}' \
+              > "$RUNNER_TEMP/blob.json"
+            gh api "repos/$GH_REPO/git/blobs" --input "$RUNNER_TEMP/blob.json" --jq .sha
+          }
+          manifest=$(blob pyproject.toml)
+          lockfile=$(blob uv.lock)
+
+          base=$(gh api "repos/$GH_REPO/git/commits/$COMMIT" --jq .tree.sha)
+          jq -n --arg base "$base" --arg m "$manifest" --arg l "$lockfile" '{
+            base_tree: $base,
+            tree: [
+              {path: "pyproject.toml", mode: "100644", type: "blob", sha: $m},
+              {path: "uv.lock", mode: "100644", type: "blob", sha: $l}
+            ]
+          }' > "$RUNNER_TEMP/tree.json"
+          tree=$(gh api "repos/$GH_REPO/git/trees" --input "$RUNNER_TEMP/tree.json" --jq .sha)
+
+          jq -n --arg m "chore: propose $VERSION" --arg t "$tree" --arg p "$COMMIT" \
+            '{message: $m, tree: $t, parents: [$p]}' > "$RUNNER_TEMP/commit.json"
+          proposed=$(gh api "repos/$GH_REPO/git/commits" --input "$RUNNER_TEMP/commit.json" --jq .sha)
+
+          gh api -X PATCH "repos/$GH_REPO/git/refs/heads/$PROPOSAL_BRANCH" -F force=true -f "sha=$proposed" \
+            || gh api "repos/$GH_REPO/git/refs" -f "ref=refs/heads/$PROPOSAL_BRANCH" -f "sha=$proposed"
+
+      - name: Open or refresh the proposal
+        if: steps.close.outputs.empty != 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE: ${{ github.ref_name }}
+          NUMBER: ${{ steps.version.outputs.number }}
+          VERSION: ${{ steps.version.outputs.version }}
+          COMPUTED: ${{ steps.next.outputs.version }}
+        run: |
+          {
+            printf '<!-- %s%s -->\n\n' "$MARKER" "$COMPUTED"
+            printf 'Merging this releases v%s. The notes below are the ones it will publish.\n\n' "$VERSION"
+            printf 'Editing the version in pyproject.toml on this branch overrides the computed one, and survives every refresh.\n\n'
+            cat "$RUNNER_TEMP/notes.md"
+          } > "$RUNNER_TEMP/body.md"
+          if [ -n "$NUMBER" ]; then
+            gh pr edit "$NUMBER" --title "chore: release v$VERSION" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --head "$PROPOSAL_BRANCH" --base "$BASE" \
+              --title "chore: release v$VERSION" --body-file "$RUNNER_TEMP/body.md"
+          fi
