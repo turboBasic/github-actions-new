@@ -114,7 +114,53 @@ the repository until someone edits the ruleset by hand.
 
 ### `pr-description`
 
-Not shipped yet.
+Fills a pull request's body from the commits in its range, into your own template: the subjects as a
+summary, the full messages as a change list with each body indented under its subject.
+
+```yaml
+name: describe-pr
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  describe:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: turboBasic/github-actions-new/.github/workflows/pr-description.yml@v0.1
+```
+
+Required context: `describe / pr-description`.
+
+**You identify nothing.** No token, no pull request number, no repository, no commit range — the
+capability owns its own full-history checkout and reads all of it from the run. That is not a
+convenience: every one of those as an input is a value a call site can get wrong, and the one that
+used to bite was checkout depth, which silently truncated the range. A test asserts none of them can
+come back.
+
+Your template needs two substitution points, each on a line of its own:
+
+```markdown
+## What changed
+
+<!-- pr-description:summary -->
+
+## Commits
+
+<!-- pr-description:changes -->
+```
+
+They are HTML comments, so a template carrying them reads normally whether or not this ever runs. The
+first becomes one line per commit subject; the second becomes one list item per commit with its body's
+paragraphs indented underneath, paragraph breaks intact. An empty range leaves a comment rather than an
+empty heading — a section with nothing under it reads as one somebody forgot to write. A template
+missing either marker fails the run naming which one and where to put it.
+
+**The trigger is `opened` and nothing else.** Adding `synchronize` would rewrite the body on every
+push, discarding whatever a human typed into it since — and the body is where they explain *why*, which
+no renderer can reconstruct from commits.
 
 ### `release`
 

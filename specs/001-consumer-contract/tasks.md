@@ -184,13 +184,13 @@ and the consumer writes one `uses:` and one permission — nothing else.
 **Independent test**: A pull request carrying one commit with a body and one without opens with both
 subjects listed and the one body indented under its subject, with no checkout written by the caller.
 
-- [ ] T055 [US3] Add the `pr-description` row to `tests/published_surface.toml`: check name `pr-description`, inputs `template-path` and `timeout-minutes` **only**, `contents: read` and `pull-requests: write`
-- [ ] T056 [US3] Create `.github/workflows/pr-description.yml` as a callable workflow owning its own full-history checkout, reading the pull request, the repository and the commit range from the run rather than from inputs (FR-029a, OQ-010)
-- [ ] T057 [US3] Assert in `tests/test_workflow_properties.py` that the capability declares no token, pull-request-number, repository or SHA input — the shallow-checkout failure mode is removed rather than documented, and a reintroduced identifying input is a regression
-- [ ] T058 [US3] Implement the rendering in `.github/workflows/pr-description.yml`: subjects as a summary list, full messages as a change list, multi-paragraph bodies keeping their paragraph breaks inside their list item, and an empty range rendering invisible prompts rather than blank sections
-- [ ] T059 [US3] Provision the rendering tooling inside the capability so the consumer needs no language or package-manager setup step, and record its empty tool-prerequisite list in the fixture (FR-029)
-- [ ] T060 [US3] Create `.github/workflows/describe-pr.yml` calling `$/.github/workflows/pr-description.yml` on pull-request opening only, since rewriting the body on every push discards whatever a human typed
-- [ ] T061 [US3] Fill the `pr-description` section of `README.md`: the call site, the two template substitution points, and why the trigger is `opened` alone
+- [X] T055 [US3] Add the `pr-description` row to `tests/published_surface.toml`: check name `pr-description`, inputs `template-path` and `timeout-minutes` **only**, `contents: read` and `pull-requests: write`
+- [X] T056 [US3] Create `.github/workflows/pr-description.yml` as a callable workflow owning its own full-history checkout, reading the pull request, the repository and the commit range from the run rather than from inputs (FR-029a, OQ-010)
+- [X] T057 [US3] Assert in `tests/test_workflow_properties.py` that the capability declares no token, pull-request-number, repository or SHA input — the shallow-checkout failure mode is removed rather than documented, and a reintroduced identifying input is a regression
+- [X] T058 [US3] Implement the rendering in `.github/workflows/pr-description.yml`: subjects as a summary list, full messages as a change list, multi-paragraph bodies keeping their paragraph breaks inside their list item, and an empty range rendering invisible prompts rather than blank sections
+- [X] T059 [US3] Provision the rendering tooling inside the capability so the consumer needs no language or package-manager setup step, and record its empty tool-prerequisite list in the fixture (FR-029)
+- [X] T060 [US3] Create `.github/workflows/describe-pr.yml` calling `$/.github/workflows/pr-description.yml` on pull-request opening only, since rewriting the body on every push discards whatever a human typed
+- [X] T061 [US3] Fill the `pr-description` section of `README.md`: the call site, the two template substitution points, and why the trigger is `opened` alone
 
 **Checkpoint**: US3 delivered. Both consumers of the old action form now write one `uses:`.
 
