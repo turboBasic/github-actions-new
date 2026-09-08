@@ -69,7 +69,13 @@ jobs:
 
       # Installs what the calling repository's own [tools] table pins, and nothing this capability
       # chose for it — which is the whole reason a local verdict and this one agree.
+      #
+      # `minimum_release_age` rather than a pinned version: a task-runner release whose tag exists
+      # before its assets do breaks every consumer at once, and waiting a day for one costs nothing.
+      # A pinned version would go stale; this does not.
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          minimum_release_age: 24h
 
       - name: Pre-flight the tools this capability invokes
         env:

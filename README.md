@@ -155,9 +155,24 @@ Your template needs two substitution points, each on a line of its own:
 
 They are HTML comments, so a template carrying them reads normally whether or not this ever runs. The
 first becomes one line per commit subject; the second becomes one list item per commit with its body's
-paragraphs indented underneath, paragraph breaks intact. An empty range leaves a comment rather than an
-empty heading — a section with nothing under it reads as one somebody forgot to write. A template
-missing either marker fails the run naming which one and where to put it.
+paragraphs indented underneath, paragraph breaks intact. Git trailers are dropped — a co-author line is
+provenance, not a description of the change — while a `BREAKING CHANGE:` paragraph is kept. An empty
+range leaves a comment rather than an empty heading, because a section with nothing under it reads as
+one somebody forgot to write.
+
+**It renders into the body, not over it.** GitHub pre-fills a new pull request's body from your
+template, so on `opened` the markers are already in the body along with anything the author typed before
+submitting — and rendering into the body is what keeps their prose. Three cases, so nothing a person
+wrote is ever discarded:
+
+| The body | What happens |
+| --- | --- |
+| carries both markers | rendered into, and everything else in it survives |
+| has content but no markers | left alone, with a notice saying so — a person wrote it |
+| is empty | the template is rendered and becomes the body |
+
+Only that last case reads `template-path` at all, and only then does a template missing either marker
+fail the run, naming which one and where to put it.
 
 **The trigger is `opened` and nothing else.** Adding `synchronize` would rewrite the body on every
 push, discarding whatever a human typed into it since — and the body is where they explain *why*, which
