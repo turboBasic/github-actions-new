@@ -33,6 +33,7 @@ stdlib
 
 # --- Config keys ---
 addopts
+conftest
 testpaths
 
 # --- Repository jargon ---

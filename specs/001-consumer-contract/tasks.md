@@ -144,15 +144,15 @@ here ships without a dry run first.
 
 ### The decision unit — tests before code
 
-- [ ] T033 [P] [US4] Create `tests/test_release_decisions.py` covering version parsing: exactly `N.N.N`, no pre-release, no build metadata, no leading `v`, and absence returned rather than raised
-- [ ] T034 [P] [US4] Add compatibility-line tests to `tests/test_release_decisions.py`: `(major,)` from `1.0.0` up, `(major, minor)` below it, and a test asserting this is the **only** place the boundary is decided (principle I, and what principle V turns on)
-- [ ] T035 [P] [US4] Add moving-ref tests to `tests/test_release_decisions.py`: `v0.1` below `1.0.0`, `v1` above, never `v0`, and **total — never empty for any version the refusals admit**. This replaces the dead guard rather than carrying it forward (R3, OQ-011)
-- [ ] T036 [P] [US4] Add increment tests to `tests/test_release_decisions.py` from the table in `data-model.md`, including the two the naive reading gets wrong: below `1.0.0` a break advances the minor, and a feature advances only the patch
-- [ ] T037 [P] [US4] Add refusal-ladder tests to `tests/test_release_decisions.py`: not on the default branch, a version that does not parse, not ahead of the highest release across every line, empty notes, and a break staying on a line that already has a release
-- [ ] T038 [P] [US4] Add three-way verdict tests to `tests/test_release_decisions.py`: a routine push declines with a notice, a dry run proceeds reporting what it would refuse, anything else refuses
-- [ ] T039 [P] [US4] Add surface-declaration tests to `tests/test_release_decisions.py`: the three distinguishable states, an unknown key refused rather than ignored, a non-list value refused rather than coerced, and a path that is empty or holds whitespace or begins with `-` refused
-- [ ] T040 [US4] Create `actions/release-decisions/decisions.py`: standard-library only, no network, pure functions for every value in `data-model.md` separated from the environment-in / output-out edge. Make T033–T039 pass
-- [ ] T041 [US4] Create `actions/release-decisions/action.yml` declaring the decision names and the per-question inputs, every value reaching the module through `env:`. Mark it internal in `tests/published_surface.toml` — `published = false`, no check name, inputs not compared (OQ-003)
+- [X] T033 [P] [US4] Create `tests/test_release_decisions.py` covering version parsing: exactly `N.N.N`, no pre-release, no build metadata, no leading `v`, and absence returned rather than raised
+- [X] T034 [P] [US4] Add compatibility-line tests to `tests/test_release_decisions.py`: `(major,)` from `1.0.0` up, `(major, minor)` below it, and a test asserting this is the **only** place the boundary is decided (principle I, and what principle V turns on)
+- [X] T035 [P] [US4] Add moving-ref tests to `tests/test_release_decisions.py`: `v0.1` below `1.0.0`, `v1` above, never `v0`, and **total — never empty for any version the refusals admit**. This replaces the dead guard rather than carrying it forward (R3, OQ-011)
+- [X] T036 [P] [US4] Add increment tests to `tests/test_release_decisions.py` from the table in `data-model.md`, including the two the naive reading gets wrong: below `1.0.0` a break advances the minor, and a feature advances only the patch
+- [X] T037 [P] [US4] Add refusal-ladder tests to `tests/test_release_decisions.py`: not on the default branch, a version that does not parse, not ahead of the highest release across every line, empty notes, and a break staying on a line that already has a release
+- [X] T038 [P] [US4] Add three-way verdict tests to `tests/test_release_decisions.py`: a routine push declines with a notice, a dry run proceeds reporting what it would refuse, anything else refuses
+- [X] T039 [P] [US4] Add surface-declaration tests to `tests/test_release_decisions.py`: the three distinguishable states, an unknown key refused rather than ignored, a non-list value refused rather than coerced, and a path that is empty or holds whitespace or begins with `-` refused
+- [X] T040 [US4] Create `actions/release-decisions/decisions.py`: standard-library only, no network, pure functions for every value in `data-model.md` separated from the environment-in / output-out edge. Make T033–T039 pass
+- [X] T041 [US4] Create `actions/release-decisions/action.yml` declaring the decision names and the per-question inputs, every value reaching the module through `env:`. Mark it internal in `tests/published_surface.toml` — `published = false`, no check name, inputs not compared (OQ-003)
 
 ### The release workflows
 

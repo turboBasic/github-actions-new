@@ -37,8 +37,7 @@ run = [
   "uv run ruff check .",
   "uv run yamllint --strict .",
   "actionlint",
-  # `actions/` is held open by a `.gitkeep` until the first action lands: zizmor rejects a path
-  # that does not exist rather than skipping it, so the tree has to be there before the task names it.
+  # actionlint does not look outside `.github/workflows`, so zizmor is what covers the action tree.
   "zizmor --pedantic .github/workflows actions",
   "markdownlint-cli2 \"**/*.md\"",
   "cspell lint --no-progress .",

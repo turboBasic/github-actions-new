@@ -66,3 +66,14 @@ tool_prerequisites = []
 jobs = ["pr-title", "commit-messages"]
 event = "any event but pull_request"
 reason = "there is no title and no range to judge; a consumer must not require these contexts for another event"
+
+[release-decisions]
+kind = "action"
+# Internal surface: no stability promise, no check name, and inputs nothing outside this repository
+# names — so they are deliberately not compared. Listing them here would be a second owner that can
+# drift from `action.yml` in silence, since no gate reads it.
+published = false
+inputs = []
+permissions = {}
+tool_prerequisites = []
+skips_under = []

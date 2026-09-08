@@ -43,9 +43,11 @@ ignore = ["E501"] # line length is the formatter's job
 
 [tool.pyright]
 include = ["actions", "tests"]
-# `tests/capabilities.py` is the one owner of how a workflow is read; pytest reaches it by the test
-# file's own directory, and pyright needs the same directory named to resolve the import.
-extraPaths = ["tests"]
+# Two modules the tests import by bare name: `tests/capabilities.py`, the one owner of how a workflow
+# is read, and the decision unit, which lives beside the action that runs it. pytest reaches the first
+# by the test file's own directory and the second through `tests/conftest.py`; pyright needs both
+# directories named here to resolve either import.
+extraPaths = ["tests", "actions/release-decisions"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
