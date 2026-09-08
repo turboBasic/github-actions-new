@@ -14,6 +14,7 @@ from decisions import (
     NOTICE,
     OFF_DEFAULT_BRANCH,
     ROUTINE,
+    UNRELEASED,
     Refusal,
     Request,
     Surface,
@@ -350,3 +351,31 @@ def test_a_bumped_version_that_breaks_its_own_released_line_is_an_error_on_any_o
         )
         assert verdict.proceed is False, occasion
         assert verdict.severity == ERROR, occasion
+
+
+def test_the_unreleased_version_is_not_ahead_of_itself() -> None:
+    # What makes 0.0.0 mean "not released yet": with no releases the baseline is itself, so it is
+    # refused, and a routine merge declines quietly for as long as the manifest stands there.
+    behind = ADMITTED._replace(version_text="0.0.0", existing=())
+    assert [r.key for r in refusals(behind)] == [ALREADY_RELEASED]
+    assert "unreleased" in refusals(behind)[0].message
+    verdict = decide(behind._replace(occasion=ROUTINE))
+    assert verdict.proceed is False
+    assert verdict.severity == NOTICE
+
+
+def test_asking_deliberately_to_release_the_unreleased_version_is_an_error() -> None:
+    verdict = decide(ADMITTED._replace(version_text="0.0.0", existing=(), occasion=DELIBERATE))
+    assert verdict.proceed is False
+    assert verdict.severity == ERROR
+
+
+def test_any_version_ahead_of_the_baseline_is_admitted_with_no_releases() -> None:
+    for text in ("0.0.1", "0.1.0", "1.0.0"):
+        assert refusals(ADMITTED._replace(version_text=text, existing=())) == [], text
+
+
+def test_the_baseline_is_the_lowest_version_there_is() -> None:
+    # Nothing can sit below it, so no version is unreachable by a bump.
+    assert UNRELEASED == (0, 0, 0)
+    assert parse_version("0.0.0") == UNRELEASED

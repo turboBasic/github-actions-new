@@ -14,6 +14,11 @@ Version = tuple[int, int, int]
 # move a ref consumers pin.
 FIRST_STABLE: Version = (1, 0, 0)
 
+# The baseline a repository with no releases is measured against, which is what makes this version
+# mean "not released yet": it is not ahead of itself, so every merge declines while it stands. A
+# repository can sit here for as long as it takes to have something worth publishing.
+UNRELEASED: Version = (0, 0, 0)
+
 # No leading zero, no pre-release, no build metadata, no leading `v`.
 VERSION = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
@@ -219,16 +224,21 @@ def refusals(request: Request) -> list[Refusal]:
         # Nothing below can be decided without a version, and a refusal derived from one that was
         # never read would name a comparison nobody made.
         return found
-    highest = max(request.existing, default=None)
-    if highest is not None and version <= highest:
-        found.append(
-            Refusal(
-                ALREADY_RELEASED,
+    highest = max(request.existing, default=UNRELEASED)
+    if version <= highest:
+        if request.existing:
+            behind = (
                 f"the declared version {format_version(version)} is not ahead of "
                 f"{format_version(highest)}, the highest release across every compatibility line. A "
-                "frozen line is left where it is rather than backported",
+                "frozen line is left where it is rather than backported"
             )
-        )
+        else:
+            behind = (
+                f"nothing has been released and the declared version is {format_version(version)}, "
+                f"which is not ahead of {format_version(UNRELEASED)} — the version that means "
+                "unreleased. Bump it when the first release is ready"
+            )
+        found.append(Refusal(ALREADY_RELEASED, behind))
     if not request.notes.strip():
         found.append(
             Refusal(NO_NOTES, "the range renders no notes, so there is nothing to publish")

@@ -225,6 +225,11 @@ when the declared version is not a plain `N.N.N`; when that version is not ahead
 across *every* compatibility line; when the range renders no notes; or when the range breaks your
 consumer surface while the version stays on a line that already has a release.
 
+**Nothing is released until the version says so.** A repository with no releases is measured against
+`0.0.0`, so a manifest sitting there is not ahead of anything and every merge declines. That is the hold
+for initial development: stay at `0.0.0` for as long as it takes, then bump when there is something worth
+publishing. Nothing else to remember, and nothing to switch off afterwards.
+
 **A routine merge never reddens your default branch.** While the version has not been bumped past the
 highest release it is provisional, so nothing else about it can be judged yet — the run declines with a
 notice and releases nothing, whatever the range contains. Releasing is therefore what merging a version
