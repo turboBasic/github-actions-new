@@ -238,12 +238,24 @@ second push edits that comment rather than adding another.
   audit shortened `.github/zizmor.yml` to cite rather than restate. `.gitkeep` stays; the `scope:` list is
   unchanged.
 - [ ] T075 Verify each capability against `quickstart.md` section 3 on a real pull request, including the one thing no gate can prove: that removing a permission demand from a call site fails the run at startup with no job and no log
-  **The only task that cannot be done from a working copy.** It needs the branch pushed and a real pull
-  request: `ci / python-ci`, `commits / pr-title`, `commits / commit-messages`,
-  `describe / pr-description` and `advisory / prek-advisory` all reporting, the advisory comment
-  appearing once and being edited rather than duplicated on a second push, and a dry-run dispatch of
-  the release path creating nothing. The permission shortfall has to be tried on a scratch branch,
-  because the tree is the side that is correct.
+  **The only task that cannot be done from a working copy.** Executed against pull request #2, which is
+  where the two defects below were found rather than reasoned about.
+
+  Verified there: all five contexts report under the names the fixture promises; `$/` resolves to the
+  caller's own commit (`@refs/pull/2/merge` in the log, so the actionlint suppression bought a form that
+  works); `lint-changed-only: true` plumbs through and the changed-set lint runs; the whole-tree
+  advisory lint runs and its comment is created exactly once; the body renderer handles fifteen real
+  commits with paragraphs indented under their subjects.
+
+  Two defects the run exposed, both fixed on this branch. `pr-description` rendered the template file
+  over the whole body and discarded what the author had typed — it now renders into the body, and only
+  falls back to the template when the body is empty. And `mise-action` resolved a mise version whose tag
+  existed before its release did, failing both capabilities that provision the task runner; the guard is
+  `minimum_release_age`.
+
+  Still outstanding, and none of it reachable from a branch: a dry-run dispatch of the release path,
+  which fires on a push to the default branch only; and the permission shortfall, which has to be tried
+  on a scratch branch because the tree is the side that is correct.
 - [X] T076 Confirm `mise run ci` is green and needed no network at any point
   Verified under a real network block, not a proxy: `sandbox-exec -p '(version 1)(allow default)(deny
   network*)' mise run ci` is green — 76 tests, every linter, no reachability of any kind.
