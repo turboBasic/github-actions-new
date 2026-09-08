@@ -150,13 +150,21 @@ jobs:
           PY
           uv lock
 
+          # `--rawfile`, never an argument: a base64 of the lockfile is far past the argument-length
+          # limit, and the blobs API takes UTF-8 directly, so there is nothing to encode.
           blob() {
-            jq -n --arg content "$(base64 -w0 < "$1")" '{content: $content, encoding: "base64"}' \
+            jq -n --rawfile content "$1" '{content: $content, encoding: "utf-8"}' \
               > "$RUNNER_TEMP/blob.json"
             gh api "repos/$GH_REPO/git/blobs" --input "$RUNNER_TEMP/blob.json" --jq .sha
           }
           manifest=$(blob pyproject.toml)
           lockfile=$(blob uv.lock)
+          for sha in "$manifest" "$lockfile"; do
+            case "$sha" in
+              ????????????????????????????????????????) ;;
+              *) echo "::error::a blob came back as '$sha' rather than a sha, so the tree would name nothing. The proposal was not written." >&2; exit 1 ;;
+            esac
+          done
 
           base=$(gh api "repos/$GH_REPO/git/commits/$COMMIT" --jq .tree.sha)
           jq -n --arg base "$base" --arg m "$manifest" --arg l "$lockfile" '{
