@@ -237,7 +237,7 @@ second push edits that comment rather than adding another.
   gate is the record. A fifth statement of one fact is the fork principle I exists to remove, and the
   audit shortened `.github/zizmor.yml` to cite rather than restate. `.gitkeep` stays; the `scope:` list is
   unchanged.
-- [ ] T075 Verify each capability against `quickstart.md` section 3 on a real pull request, including the one thing no gate can prove: that removing a permission demand from a call site fails the run at startup with no job and no log
+- [X] T075 Verify each capability against `quickstart.md` section 3 on a real pull request, including the one thing no gate can prove: that removing a permission demand from a call site fails the run at startup with no job and no log
   **The only task that cannot be done from a working copy.** Executed against pull request #2, which is
   where the two defects below were found rather than reasoned about.
 
@@ -253,9 +253,20 @@ second push edits that comment rather than adding another.
   existed before its release did, failing both capabilities that provision the task runner; the guard is
   `minimum_release_age`.
 
-  Still outstanding, and none of it reachable from a branch: a dry-run dispatch of the release path,
-  which fires on a push to the default branch only; and the permission shortfall, which has to be tried
-  on a scratch branch because the tree is the side that is correct.
+  The comment's idempotence was settled by tampering with it and re-running: the same comment id came
+  back with the tampered line gone and no second comment, which two clean runs alone could not show —
+  GitHub does not move `updated_at` when a PATCH body is byte-identical.
+
+  **The permission shortfall was observed on a scratch branch and is exactly as documented.** With
+  `pull-requests: write` removed from `advisory.yml`'s call, `mise run ci` stayed green — no gate here can
+  see it — and GitHub reported `startup_failure` with a job count of zero, no readable log, no
+  annotation, and no `advisory / prek-advisory` check run recorded against the commit at all. A ruleset
+  requiring that context would block every pull request with nothing to read. The branch and its pull
+  request were deleted.
+
+  One thing remains, and `quickstart.md` section 3 already separates it as not provable this way: a
+  dry-run dispatch of the release path. It fires on a push to the default branch, so it is the first
+  thing to do after this merges and before anything is tagged.
 - [X] T076 Confirm `mise run ci` is green and needed no network at any point
   Verified under a real network block, not a proxy: `sandbox-exec -p '(version 1)(allow default)(deny
   network*)' mise run ci` is green — 76 tests, every linter, no reachability of any kind.
