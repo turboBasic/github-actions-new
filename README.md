@@ -330,3 +330,5 @@ capability names a ref that does not exist until a release exists.
 mise run setup   # tools, dependencies, git hooks
 mise run ci      # everything CI runs
 ```
+
+<!-- sandbox: throwaway change to trigger a real release run. -->
