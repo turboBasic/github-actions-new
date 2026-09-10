@@ -15,8 +15,7 @@ FIXTURE = Path(__file__).parent / "published_surface.toml"
 
 Doc = dict[Any, Any]
 
-# A called job's `if:` names the inputs that gate it. Reading them out of the condition is what lets a
-# caller's `with:` be judged against it, rather than trusting prose in the input's description.
+# The inputs a job's `if:` consults, which are the ones a caller can switch it off with.
 INPUT_REF = re.compile(r"inputs\.([A-Za-z0-9_-]+)")
 
 # A workflow's `on:` key is YAML 1.1's `true`, so a parser hands it back as the boolean and every
@@ -121,10 +120,9 @@ def _cannot_judge(job: Doc, wf_triggers: Doc, capability: str | None) -> str | N
 
 
 def switched_off(job: Doc, capability: str | None, called_job: str) -> str | None:
-    # The caller's own `with:` read against the called job's `if:`. A capability whose input switches a
-    # check off skips that job, and a skipped job reports success — so the context it composes stops
-    # judging while still reporting green. Anything but the default or a literal `true` is refused: an
-    # expression cannot be resolved offline, so it is not provably on either.
+    # A switched-off check skips its job, and a skipped job reports success. Anything but the default or
+    # a literal `true` is refused, an expression included: it cannot be resolved offline, so it is not
+    # provably on.
     if capability is None:
         return None
     doc = workflow_docs().get(capability)

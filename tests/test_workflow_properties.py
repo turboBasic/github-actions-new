@@ -202,8 +202,8 @@ def apply_steps() -> list[Doc]:
 
 
 def test_the_applier_is_reachable_by_dispatch_and_a_schedule_alone() -> None:
-    # FR-003. A ruleset write has no revert, and a push or a merge trigger here would apply whatever
-    # the tree said at that commit before anyone had read the difference.
+    # FR-003. A push or a merge trigger would apply whatever the tree said at that commit, before
+    # anyone had read the difference, and a ruleset write has no revert.
     reached_by = set(triggers(load(WORKFLOW_DIR / "apply-ruleset.yml")))
     assert reached_by == {"workflow_dispatch", "schedule"}, (
         f"apply-ruleset is reachable from {sorted(reached_by)}. Applying is a human act, and the "
@@ -212,9 +212,8 @@ def test_the_applier_is_reachable_by_dispatch_and_a_schedule_alone() -> None:
 
 
 def test_every_ruleset_writing_step_is_gated_on_the_event_the_dry_run_and_the_verdict() -> None:
-    # The dispatch-only half of FR-003, which the trigger set above no longer holds on its own. Each
-    # of the three is a one-word deletion away from a cron that writes, a dry run that writes, or a
-    # write with nothing decided — and none of the three would look like anything in review.
+    # The dispatch-only half of FR-003, which the trigger set alone no longer holds. Deleting any one
+    # of the three clauses gives a cron that writes, a dry run that writes, or a write over a refusal.
     found = 0
     for step in apply_steps():
         if SENDS_A_BODY not in str(step.get("run", "")):
@@ -241,9 +240,8 @@ def test_every_ruleset_writing_step_is_gated_on_the_event_the_dry_run_and_the_ve
 
 
 def test_the_scheduled_read_fails_on_any_verdict_but_nothing() -> None:
-    # The drift alarm, and the one thing that makes the tree authoritative rather than aspirational.
     # A condition that stops matching leaves a scheduled run reporting success over a live ruleset
-    # nobody is applying — green, having judged nothing.
+    # nobody is applying.
     alarm = [step for step in apply_steps() if step.get("id") == "drift"]
     assert len(alarm) == 1, (
         "apply-ruleset names no step `drift`, so nothing reports that the live ruleset stopped "

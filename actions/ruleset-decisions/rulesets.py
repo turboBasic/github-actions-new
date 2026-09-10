@@ -5,9 +5,8 @@ from typing import Any, NamedTuple, cast
 
 Doc = dict[str, Any]
 
-# The six fields a write to the rulesets API accepts. tests/capabilities.py owns the same fact for the
-# gate that reads the committed file from the tree; this module owns it for the workflow that writes it,
-# and neither imports the other — the action ships alone, and the suite runs with no network.
+# The six fields a write to the rulesets API accepts. Everything else a read returns is rejected on a
+# write, so the committed file holds these and comparison is over these alone.
 WRITABLE_FIELDS = frozenset(
     {"name", "target", "enforcement", "conditions", "rules", "bypass_actors"}
 )
@@ -108,9 +107,8 @@ def render_difference(committed: Doc, live: Doc) -> str:
 
 
 def decide(committed: Doc, live: list[Doc]) -> Verdict:
-    # `live` is every repository-owned ruleset as the detail endpoint returns it, not the list
-    # endpoint's summaries: the summary carries no rules, conditions or bypass_actors, so a caller
-    # handing those over would be comparing the committed file against fields that are simply absent.
+    # `live` holds details, not list-endpoint summaries: a summary carries no rules, conditions or
+    # bypass_actors, and comparing against absent fields reports drift that is not there.
     problem = shape_problem(committed)
     if problem:
         return Verdict(REFUSE, "", "", None, problem)
