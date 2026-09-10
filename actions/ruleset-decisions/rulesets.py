@@ -107,7 +107,10 @@ def render_difference(committed: Doc, live: Doc) -> str:
     return "\n".join(lines)
 
 
-def decide(committed: Doc, live_list: list[Doc], detail: Doc | None) -> Verdict:
+def decide(committed: Doc, live: list[Doc]) -> Verdict:
+    # `live` is every repository-owned ruleset as the detail endpoint returns it, not the list
+    # endpoint's summaries: the summary carries no rules, conditions or bypass_actors, so a caller
+    # handing those over would be comparing the committed file against fields that are simply absent.
     problem = shape_problem(committed)
     if problem:
         return Verdict(REFUSE, "", "", None, problem)
@@ -115,7 +118,7 @@ def decide(committed: Doc, live_list: list[Doc], detail: Doc | None) -> Verdict:
     name = str(committed["name"])
     matches = [
         ruleset
-        for ruleset in live_list
+        for ruleset in live
         if ruleset.get("source_type") == "Repository" and ruleset.get("name") == name
     ]
 
@@ -141,19 +144,8 @@ def decide(committed: Doc, live_list: list[Doc], detail: Doc | None) -> Verdict:
         )
 
     live_id = str(matches[0].get("id", ""))
-    if detail is None:
-        return Verdict(
-            REFUSE,
-            "",
-            "",
-            None,
-            f"exactly one ruleset named {name!r} exists (id {live_id}), but its full detail was not "
-            "read — the list endpoint carries no rules, conditions or bypass_actors to compare "
-            "against. Fetch GET /repos/{owner}/{repo}/rulesets/{id} before deciding",
-        )
-
     committed_norm = normalize(committed)
-    live_norm = normalize(detail)
+    live_norm = normalize(matches[0])
     if committed_norm == live_norm:
         return Verdict(
             NOTHING,
@@ -203,12 +195,12 @@ def annotate(severity: str, message: str) -> None:
 
 
 def main() -> int:
-    committed = read_doc(read_text("COMMITTED"))
-    live_list = read_list(read_text("LIVE"))
-    detail_path = read_text("DETAIL")
-    detail = read_doc(detail_path) if detail_path else None
+    committed_path = read_text("COMMITTED")
+    if not os.path.isfile(committed_path):
+        annotate("error", f"no committed ruleset at {committed_path!r} — check the dispatch's name")
+        return 1
 
-    verdict = decide(committed, live_list, detail)
+    verdict = decide(read_doc(committed_path), read_list(read_text("LIVE")))
 
     body_path = read_text("BODY_PATH")
     if verdict.body is not None and body_path:

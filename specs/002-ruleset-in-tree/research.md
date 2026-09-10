@@ -151,6 +151,13 @@ nothing is overwritten before the difference has been printed and read.
 drift could be attributed, rejected as a second owner of the ruleset's state — principle I, and the exact
 fork this feature exists to remove.
 
+**Amended**: the reasoning above holds for the *apply* path and only there. A scheduled read is a
+different question, and this decision did not answer it: on a dispatch a difference is the reason to run,
+but on a schedule a difference means GitHub stopped matching the tree with nobody watching. So the same
+workflow runs weekly over every committed ruleset, reads, and fails on any difference. It needs no
+attribution and records no state, so neither rejection above applies to it. Without it the tree is
+authoritative only while somebody remembers to dispatch, which is not a property a gate can rest on.
+
 ## R10 — What the first apply must not change
 
 **Decision**: the committed file reproduces the live ruleset exactly as read on 2026-09-08, including the

@@ -28,19 +28,14 @@ COMMITTED: Doc = {
     "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
 }
 
-LIVE_SUMMARY: Doc = {
-    "id": 1,
-    "name": "protect-default-branch",
-    "source_type": "Repository",
-    "target": "branch",
-    "enforcement": "active",
-}
-
 
 def _detail(**overrides: Any) -> Doc:
+    # What `GET /repos/{owner}/{repo}/rulesets/{id}` returns: the committed shape plus the read-only
+    # fields a write rejects. `decide` is handed a list of these, never the list endpoint's summaries.
     detail: Doc = {
         **COMMITTED,
         "id": 1,
+        "source_type": "Repository",
         "node_id": "n1",
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z",
@@ -95,39 +90,37 @@ def test_shape_problem_is_none_for_a_well_formed_ruleset() -> None:
 
 def test_a_malformed_committed_file_refuses_before_any_live_ruleset_is_read() -> None:
     bad = {**COMMITTED, "target": "tag"}
-    verdict = decide(bad, [], None)
+    verdict = decide(bad, [])
     assert verdict.verdict == REFUSE
     assert "tag" in verdict.message
 
 
 def test_no_matching_name_creates() -> None:
-    verdict = decide(COMMITTED, [], None)
+    verdict = decide(COMMITTED, [])
     assert verdict.verdict == CREATE
     assert verdict.body == COMMITTED
 
 
 def test_a_match_whose_source_type_is_not_repository_is_not_a_match() -> None:
-    organization_owned = {**LIVE_SUMMARY, "source_type": "Organization"}
-    verdict = decide(COMMITTED, [organization_owned], None)
+    verdict = decide(COMMITTED, [_detail(source_type="Organization")])
+    assert verdict.verdict == CREATE
+
+
+def test_a_ruleset_of_another_name_is_not_a_match() -> None:
+    verdict = decide(COMMITTED, [_detail(name="something-else")])
     assert verdict.verdict == CREATE
 
 
 def test_two_rulesets_sharing_the_name_refuse() -> None:
-    verdict = decide(COMMITTED, [LIVE_SUMMARY, {**LIVE_SUMMARY, "id": 2}], None)
+    verdict = decide(COMMITTED, [_detail(), _detail(id=2)])
     assert verdict.verdict == REFUSE
     assert "2 rulesets" in verdict.message
     assert "'1'" in verdict.message
     assert "'2'" in verdict.message
 
 
-def test_exactly_one_match_with_no_detail_refuses_rather_than_guesses() -> None:
-    verdict = decide(COMMITTED, [LIVE_SUMMARY], None)
-    assert verdict.verdict == REFUSE
-    assert "detail was not read" in verdict.message
-
-
 def test_a_matching_detail_reads_as_nothing_to_change() -> None:
-    verdict = decide(COMMITTED, [LIVE_SUMMARY], _detail())
+    verdict = decide(COMMITTED, [_detail()])
     assert verdict.verdict == NOTHING
     assert verdict.ruleset_id == "1"
     assert verdict.difference == ""
@@ -138,7 +131,7 @@ def test_read_only_fields_do_not_cause_a_reported_difference() -> None:
     # R4: id, node_id, created_at, updated_at, _links and current_user_can_bypass come back on a read
     # and are not settable. A byte comparison would report drift on updated_at at every dispatch.
     detail = _detail(updated_at="2099-01-01T00:00:00Z", current_user_can_bypass="never")
-    assert decide(COMMITTED, [LIVE_SUMMARY], detail).verdict == NOTHING
+    assert decide(COMMITTED, [detail]).verdict == NOTHING
 
 
 def test_reordered_rules_and_contexts_still_read_as_nothing_to_change() -> None:
@@ -151,12 +144,11 @@ def test_reordered_rules_and_contexts_still_read_as_nothing_to_change() -> None:
             {"type": "deletion"},
         ]
     )
-    assert decide(COMMITTED, [LIVE_SUMMARY], reordered).verdict == NOTHING
+    assert decide(COMMITTED, [reordered]).verdict == NOTHING
 
 
 def test_a_real_difference_updates_with_the_difference_rendered_both_sides() -> None:
-    detail = _detail(enforcement="evaluate")
-    verdict = decide(COMMITTED, [LIVE_SUMMARY], detail)
+    verdict = decide(COMMITTED, [_detail(enforcement="evaluate")])
     assert verdict.verdict == UPDATE
     assert verdict.ruleset_id == "1"
     assert verdict.body == COMMITTED

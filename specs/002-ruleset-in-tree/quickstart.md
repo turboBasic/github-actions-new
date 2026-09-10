@@ -19,7 +19,7 @@ cat .github/rulesets/protect-default-branch.json
 
 ## Read what the tree composes
 
-Nine contexts, three of them safe to require. The composer is in `tests/capabilities.py`
+Three of them are safe to require. The composer is in `tests/capabilities.py`
 ([R6](./research.md#r6--the-gates-two-halves)).
 
 ```bash
@@ -92,6 +92,15 @@ On this feature's own first dispatch, expect **nothing to change** — the commi
 ruleset field for field ([R10](./research.md#r10--what-the-first-apply-must-not-change)), which is FR-013
 and SC-006. A difference on the first dispatch means the committed file was transcribed wrong; read it
 before running step 2.
+
+## When GitHub stops matching the tree
+
+The same workflow runs on a weekly schedule over every file in `.github/rulesets/`. It reads and never
+writes — the write step is reachable from `workflow_dispatch` alone — and it fails on any difference,
+which is the alarm a hand edit in the UI would otherwise never raise. The fix is a dispatch: read the
+difference, then apply.
+
+A dispatch, by contrast, exits successfully on a difference. A difference is the reason to dispatch.
 
 ## Compare against the live ruleset by hand
 

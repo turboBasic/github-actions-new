@@ -9,14 +9,11 @@ inputs:
     description: Path to the committed ruleset JSON.
     required: true
   live:
-    description: Path to the JSON body of `GET /repos/{owner}/{repo}/rulesets`.
-    required: true
-  detail:
     description: >-
-      Path to the JSON body of `GET /repos/{owner}/{repo}/rulesets/{id}` for the one ruleset whose
-      name and source_type matched in `live`. Absent unless exactly one match exists.
-    required: false
-    default: ""
+      Path to a JSON array of every repository-owned ruleset as `GET
+      /repos/{owner}/{repo}/rulesets/{id}` returns it. The list endpoint's summaries will not do: they
+      carry no rules, conditions or bypass_actors, so nothing could be compared.
+    required: true
   body-path:
     description: Where to write the body to send, for create or update. Absent otherwise.
     required: false
@@ -50,6 +47,5 @@ runs:
       env:
         COMMITTED: ${{ inputs.committed }}
         LIVE: ${{ inputs.live }}
-        DETAIL: ${{ inputs.detail }}
         BODY_PATH: ${{ inputs.body-path || format('{0}/ruleset-body.json', runner.temp) }}
       run: python3 "$GITHUB_ACTION_PATH/rulesets.py"
