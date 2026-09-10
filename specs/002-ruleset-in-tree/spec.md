@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-08
 
-**Status**: Draft
+**Status**: Merged 2026-09-10, in no release yet
 
 **Input**: Issue #6 — "codify the branch ruleset so a retired check name cannot pass unnoticed"
 
