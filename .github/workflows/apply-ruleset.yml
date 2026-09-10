@@ -1,0 +1,100 @@
+name: apply-ruleset
+
+# A ruleset is administrative surface with no revert once written, so this only ever runs by hand. It
+# defaults to a dry run: the difference between the committed file and the live ruleset always prints
+# before anything is written, so a person reads it before choosing to proceed.
+on:
+  workflow_dispatch:
+    inputs:
+      ruleset:
+        description: Name of the committed file under .github/rulesets, without the .json suffix.
+        required: true
+      dry-run:
+        description: Print the difference and stop before writing.
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  apply:
+    name: apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # the checkout, to read the committed file
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-administration: write # the only right a ruleset read or write needs (R8)
+
+      - name: Read the live rulesets
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh api "repos/$GH_REPO/rulesets" > "$RUNNER_TEMP/live.json"
+
+      - id: match
+        name: Find the one candidate this committed file names, if exactly one
+        env:
+          COMMITTED: .github/rulesets/${{ inputs.ruleset }}.json
+        run: |
+          name=$(jq -r .name "$COMMITTED")
+          ids=$(jq -r --arg name "$name" \
+            '[.[] | select(.source_type == "Repository" and .name == $name) | .id]' \
+            "$RUNNER_TEMP/live.json")
+          printf 'count=%s\n' "$(jq 'length' <<< "$ids")" >> "$GITHUB_OUTPUT"
+          printf 'id=%s\n' "$(jq -r '.[0] // ""' <<< "$ids")" >> "$GITHUB_OUTPUT"
+
+      - name: Read the one detail
+        if: steps.match.outputs.count == '1'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          ID: ${{ steps.match.outputs.id }}
+        run: gh api "repos/$GH_REPO/rulesets/$ID" > "$RUNNER_TEMP/detail.json"
+
+      - id: decide
+        continue-on-error: true
+        uses: $/actions/ruleset-decisions
+        with:
+          committed: .github/rulesets/${{ inputs.ruleset }}.json
+          live: ${{ runner.temp }}/live.json
+          detail: ${{ steps.match.outputs.count == '1' && format('{0}/detail.json', runner.temp) || '' }}
+
+      - name: Print the difference
+        env:
+          DIFFERENCE: ${{ steps.decide.outputs.difference }}
+        run: printf '%s\n' "$DIFFERENCE"
+
+      - name: Refuse
+        if: steps.decide.outcome == 'failure'
+        run: exit 1
+
+      - name: Write the ruleset
+        if: >-
+          steps.decide.outcome == 'success' && inputs.dry-run == false &&
+          (steps.decide.outputs.verdict == 'create' || steps.decide.outputs.verdict == 'update')
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          VERDICT: ${{ steps.decide.outputs.verdict }}
+          RULESET_ID: ${{ steps.decide.outputs.ruleset-id }}
+          BODY: ${{ steps.decide.outputs.body }}
+        run: |
+          if [ "$VERDICT" = create ]; then
+            gh api "repos/$GH_REPO/rulesets" --input "$BODY"
+          else
+            gh api -X PUT "repos/$GH_REPO/rulesets/$RULESET_ID" --input "$BODY"
+          fi

@@ -15,7 +15,14 @@ VI).
 | --- | --- | --- | --- |
 | `committed` | `COMMITTED` | yes | Path to the committed ruleset JSON |
 | `live` | `LIVE` | yes | Path to the JSON body of `GET /repos/{owner}/{repo}/rulesets`, as the workflow saved it |
+| `detail` | `DETAIL` | no | Path to the JSON body of `GET /repos/{owner}/{repo}/rulesets/{id}` for the one ruleset whose name and `source_type` matched in `live`. Absent unless exactly one match exists |
 | `body-path` | `BODY_PATH` | no | Where to write the body to send. Defaults under `RUNNER_TEMP` |
+
+`live` alone cannot decide `update` versus `nothing`: `GET /repos/{owner}/{repo}/rulesets` (the list) carries
+`id`, `name`, `target`, `source_type`, `enforcement` and the read-only timestamps, but not `rules`,
+`conditions` or `bypass_actors` — verified live against this repository's own ruleset, not assumed. Only
+once exactly one match is found by name is there a single id to fetch detail for, so the workflow reads
+`live` first, and reads `detail` only when that leaves exactly one candidate.
 
 `live` is a path rather than a value: it is an API response of unbounded size, and a response is text
 chosen outside this repository.
@@ -36,9 +43,12 @@ chosen outside this repository.
    A failure is a `refuse` naming the offending key, not an exception.
 2. From `live`, keep only entries whose `source_type` is `Repository` and whose `name` equals the
    committed `name`. More than one is a `refuse` (FR-007). None is a `create`.
-3. Project the one match onto the committed file's six fields, normalise both by R4's sort order, and
-   compare.
-4. Equal → `nothing`. Different → `update`, with `difference` rendered field by field and `body` written.
+3. Exactly one, and `detail` is absent: `refuse`, naming the id and that its detail must be read first.
+   The workflow is expected never to hit this — it fetches `detail` whenever `live` leaves one candidate —
+   so reaching it means the workflow and this contract have drifted.
+4. Exactly one, and `detail` is present: project it and `committed` onto the committed file's six fields,
+   normalise both by R4's sort order, and compare.
+5. Equal → `nothing`. Different → `update`, with `difference` rendered field by field and `body` written.
 
 Nothing in this module reads the network, reads `GITHUB_TOKEN`, or writes outside `body-path`. That is
 what makes it testable offline, which FR-011 requires of the suite that tests it.
@@ -70,6 +80,8 @@ steps:
   checkout                              contents: read
   mint App token                        permission-administration: write   (R8)
   gh api  .../rulesets            ->    $RUNNER_TEMP/live.json
+  find the one id matching name + source_type == Repository, if exactly one
+  gh api  .../rulesets/{id}       ->    $RUNNER_TEMP/detail.json   (only if exactly one)
   uses: $/actions/ruleset-decisions
   print the difference                  always, whether or not it writes  (FR-005)
   refuse                                if verdict == refuse
@@ -79,6 +91,7 @@ steps:
 The body goes in through `--input`, never as an argument (principle VI). The token reaches `gh` as
 `GH_TOKEN` in the step's `env`, and is written nowhere (principle II).
 
-The workflow composes the context `apply-ruleset / apply`. It fires on no pull request, so it can never
+The workflow composes the context `apply` — its job calls no reusable workflow, so nothing prefixes its
+own name. It fires on no pull request, so it can never
 report on one and must never appear in a committed required list — which
 [FR-009](../spec.md#functional-requirements) enforces rather than merely asks.

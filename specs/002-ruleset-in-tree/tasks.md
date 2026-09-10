@@ -115,41 +115,41 @@ nothing written; dispatch again with the dry run off and read the change back fr
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] `actions/ruleset-decisions/rulesets.py` — the decision unit from
+- [X] T008 [US1] `actions/ruleset-decisions/rulesets.py` — the decision unit from
       [contracts/ruleset-decisions.md](./contracts/ruleset-decisions.md). Standard library only, every
       argument from the environment (`COMMITTED`, `LIVE`, `BODY_PATH`), nothing written outside
       `BODY_PATH`. Normalise per [R4](./research.md#r4--comparison-by-meaning); select the live match per
       [R5](./research.md#r5--finding-the-ruleset); emit `verdict`, `ruleset-id`, `difference`, `body`,
       `message` to `GITHUB_OUTPUT`. Mirror `actions/release-decisions/decisions.py` for shape.
-- [ ] T009 [US1] Every failure message names what was read, what it was compared against, and what to do
+- [X] T009 [US1] Every failure message names what was read, what it was compared against, and what to do
       about it — the four rows in
       [the contract's failure table](./contracts/ruleset-decisions.md#failure-messages). A malformed
       committed file is a `refuse` verdict, not a traceback.
-- [ ] T010 [P] [US1] `actions/ruleset-decisions/action.yml` — composite, inputs `committed`, `live`,
+- [X] T010 [P] [US1] `actions/ruleset-decisions/action.yml` — composite, inputs `committed`, `live`,
       `body-path`; outputs as above; one step passing every value through `env:` and running
       `python3 "$GITHUB_ACTION_PATH/rulesets.py"`. Copy the env-only discipline from
       `actions/release-decisions/action.yml` — principle VI, and `test_no_interpolation.py` reads this
       file.
-- [ ] T011 [P] [US1] `tests/conftest.py` — insert `actions/ruleset-decisions` on `sys.path` beside the
+- [X] T011 [P] [US1] `tests/conftest.py` — insert `actions/ruleset-decisions` on `sys.path` beside the
       existing entry, with the same reason it already carries: a hyphen in the directory name means it is
       not importable as a package.
-- [ ] T012 [US1] `pyproject.toml` — add `actions/ruleset-decisions` to `[tool.pyright].extraPaths`, and
+- [X] T012 [US1] `pyproject.toml` — add `actions/ruleset-decisions` to `[tool.pyright].extraPaths`, and
       add `actions/ruleset-decisions` to `[tool.turbobasic-release].exclude` per
       [R7](./research.md#r7--release-relevance). The open question there is settled: `matches()` in
       `decisions.py` tries `fnmatch(path, f"{pattern}/*")`, so the bare directory covers both files and no
       glob is needed. Keep the exclude list sorted as it is.
-- [ ] T013 [US1] `tests/published_surface.toml` — a row for `ruleset-decisions`: `kind = "action"`,
+- [X] T013 [US1] `tests/published_surface.toml` — a row for `ruleset-decisions`: `kind = "action"`,
       `published = false`, empty `inputs`, `permissions`, `tool_prerequisites` and `skips_under`, mirroring
       `release-decisions`. Without it `test_every_capability_in_the_tree_is_in_the_fixture` fails, which is
       the gate working.
-- [ ] T014 [US1] `tests/test_ruleset_decisions.py` — the four verdicts from
+- [X] T014 [US1] `tests/test_ruleset_decisions.py` — the four verdicts from
       [data-model.md](./data-model.md#apply-verdict): `create` when no live ruleset carries the name,
       `nothing` when the projection matches, `update` with a populated `difference` when it does not,
       `refuse` when two rulesets share the name ([FR-007](./spec.md#functional-requirements)). Plus: a live
       ruleset carrying `updated_at` and `_links` still reads as `nothing`, and reordered `rules` and
       `required_status_checks` still read as `nothing` — R4's whole point. Offline; the live side is a
       fixture built in the test.
-- [ ] T015 [US1] `.github/workflows/apply-ruleset.yml` — `workflow_dispatch` only
+- [X] T015 [US1] `.github/workflows/apply-ruleset.yml` — `workflow_dispatch` only
       ([FR-003](./spec.md#functional-requirements)), inputs `ruleset` and `dry-run` with `dry-run`
       defaulting to `true` (FR-004, [R9](./research.md#r9--why-there-is-no-drift-refusal)); one job with
       `timeout-minutes`; `contents: read` on the run's token for the checkout; an App token from
@@ -159,9 +159,10 @@ nothing written; dispatch again with the dry run off and read the change back fr
       `uses: $/actions/ruleset-decisions`, prints the difference unconditionally (FR-005), and writes with
       `gh api --input "$body"` only when the verdict is `create` or `update` **and** the dry run is off.
       Never a body as an argument. Every permission line carries its reason.
-- [ ] T016 [US1] Add `.github/workflows/apply-ruleset.yml` to `[tool.turbobasic-release].exclude` in
+- [X] T016 [US1] Add `.github/workflows/apply-ruleset.yml` to `[tool.turbobasic-release].exclude` in
       `pyproject.toml` — same reason as T012, and the same reason every other caller workflow of this
-      repository is already listed there.
+      repository is already listed there. (Already present from the proactive T012 edit; confirmed still
+      correct once the workflow file existed.)
 - [ ] T017 [US1] Verify by dispatch, in dry run, after the branch has merged:
       `gh workflow run apply-ruleset.yml`. Expect **nothing to change**
       ([R10](./research.md#r10--what-the-first-apply-must-not-change)). A difference means T001 was
@@ -237,7 +238,8 @@ fail quoting that capability's own recorded skip reason.
       VII made structural rather than written down.
 - [X] T027 [US3] Prove it can fail, three ways: add `advisory / prek-advisory` to the committed required
       list (`judges = false`), then `release / tag-and-publish` (no `pull_request` trigger), then
-      `apply-ruleset / apply` (same). Each must fail with its own reason. Restore the file after each.
+      `apply` (same — the applier's job calls no reusable workflow, so its composed context is its own
+      job name with no prefix). Each must fail with its own reason. Restore the file after each.
 
 **Checkpoint**: both halves of the gate hold. Every requirement in the spec is asserted by something that
 can fail.
