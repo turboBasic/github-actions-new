@@ -192,6 +192,74 @@ def test_no_step_in_the_release_path_writes_a_version() -> None:
     )
 
 
+# A ruleset write, read from the command rather than from a list this test also keeps. Only a write
+# sends a body, so `--input` is what separates the two calls in this workflow from the read above them.
+SENDS_A_BODY = "--input"
+
+
+def apply_steps() -> list[Doc]:
+    return steps_of("apply-ruleset", "apply")
+
+
+def test_the_applier_is_reachable_by_dispatch_and_a_schedule_alone() -> None:
+    # FR-003. A ruleset write has no revert, and a push or a merge trigger here would apply whatever
+    # the tree said at that commit before anyone had read the difference.
+    reached_by = set(triggers(load(WORKFLOW_DIR / "apply-ruleset.yml")))
+    assert reached_by == {"workflow_dispatch", "schedule"}, (
+        f"apply-ruleset is reachable from {sorted(reached_by)}. Applying is a human act, and the "
+        "schedule is the read that never writes"
+    )
+
+
+def test_every_ruleset_writing_step_is_gated_on_the_event_the_dry_run_and_the_verdict() -> None:
+    # The dispatch-only half of FR-003, which the trigger set above no longer holds on its own. Each
+    # of the three is a one-word deletion away from a cron that writes, a dry run that writes, or a
+    # write with nothing decided — and none of the three would look like anything in review.
+    found = 0
+    for step in apply_steps():
+        if SENDS_A_BODY not in str(step.get("run", "")):
+            continue
+        found += 1
+        condition = str(step.get("if", ""))
+        assert "github.event_name == 'workflow_dispatch'" in condition, (
+            f"apply-ruleset step {step.get('name')!r} writes under `if: {condition}`, which does not "
+            "pin the event. `inputs.dry-run` is absent on a schedule and an absent input compares "
+            "equal to false, so the cron would write"
+        )
+        assert "inputs.dry-run" in condition, (
+            f"apply-ruleset step {step.get('name')!r} writes under `if: {condition}`, which does not "
+            "exclude a dry run. A dry run that writes is not a dry run"
+        )
+        assert "steps.decide.outputs.verdict" in condition, (
+            f"apply-ruleset step {step.get('name')!r} writes under `if: {condition}`, which does not "
+            "read the verdict, so it would write over a refusal"
+        )
+    assert found == 1, (
+        f"{found} ruleset-writing steps found in apply-ruleset.yml, expected exactly one — this gate "
+        "is reading the wrong thing, or a second write appeared beside the gated one"
+    )
+
+
+def test_the_scheduled_read_fails_on_any_verdict_but_nothing() -> None:
+    # The drift alarm, and the one thing that makes the tree authoritative rather than aspirational.
+    # A condition that stops matching leaves a scheduled run reporting success over a live ruleset
+    # nobody is applying — green, having judged nothing.
+    alarm = [step for step in apply_steps() if step.get("id") == "drift"]
+    assert len(alarm) == 1, (
+        "apply-ruleset names no step `drift`, so nothing reports that the live ruleset stopped "
+        "matching the tree and every scheduled run is a green check that read nothing"
+    )
+    condition = str(alarm[0].get("if", ""))
+    assert "github.event_name == 'schedule'" in condition, (
+        f"the drift alarm runs under `if: {condition}`, which does not pin the schedule. A dispatch "
+        "exits successfully on a difference, because a difference is the reason to dispatch"
+    )
+    assert "verdict != 'nothing'" in condition, (
+        f"the drift alarm runs under `if: {condition}`, which does not read the verdict, so drift "
+        "either never fails or every run does"
+    )
+
+
 # An input naming which pull request, which repository, which commits, or with what token. The body
 # renderer reads every one of them from the run, which is what removed the shallow-checkout failure
 # mode instead of documenting it — so reintroducing any of these is a regression, not a feature.

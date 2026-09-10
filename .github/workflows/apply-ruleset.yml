@@ -129,7 +129,8 @@ jobs:
 
       # The drift alarm. A dispatch exits successfully on a difference — that is the reason to dispatch
       # — but a scheduled run finding one means GitHub stopped matching the tree with nobody watching.
-      - name: Fail on drift
+      - id: drift
+        name: Fail on drift
         if: github.event_name == 'schedule' && steps.decide.outputs.verdict != 'nothing'
         env:
           MESSAGE: ${{ steps.decide.outputs.message }}
