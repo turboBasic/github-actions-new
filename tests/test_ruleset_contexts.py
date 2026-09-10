@@ -1,45 +1,22 @@
-from capabilities import WRITABLE_FIELDS, Doc, composed_contexts, required_contexts, ruleset_docs
+from rulesets import shape_problem
+
+from capabilities import Doc, composed_contexts, required_contexts, ruleset_docs, switched_off
 
 # No check-jsonschema hook covers this file: the tool ships no schema for a repository ruleset, and
 # a `--schemafile <url>` would put the network in `mise run ci`. A mis-keyed required-status-checks
 # block would otherwise leave this gate reading zero required contexts and passing on an empty set —
 # a green gate that judged nothing — so the shape is asserted here instead, where that failure mode
 # is exactly what is being guarded against.
+#
+# `shape_problem` is the one owner of that shape, and the applier refuses on the same call. A second
+# implementation here would be two answers to what a write accepts; test_ruleset_decisions.py holds
+# what each refusal says.
 
 
-def test_a_committed_ruleset_holds_exactly_the_writable_fields() -> None:
+def test_every_committed_ruleset_is_a_shape_a_write_accepts() -> None:
     for name, doc in ruleset_docs().items():
-        unknown = set(doc) - WRITABLE_FIELDS
-        assert unknown == set(), (
-            f"{name}: unknown field {sorted(unknown)}, a write rejects anything but {sorted(WRITABLE_FIELDS)}"
-        )
-        missing = WRITABLE_FIELDS - set(doc)
-        assert missing == set(), f"{name}: missing field {sorted(missing)}"
-
-
-def test_a_committed_ruleset_targets_branches() -> None:
-    for name, doc in ruleset_docs().items():
-        assert doc["target"] == "branch", f"{name}: target {doc['target']!r}, expected 'branch'"
-
-
-def test_a_committed_ruleset_carries_exactly_one_required_status_checks_rule() -> None:
-    for name, doc in ruleset_docs().items():
-        types = [rule.get("type") for rule in doc["rules"]]
-        found = [t for t in types if t == "required_status_checks"]
-        assert len(found) == 1, (
-            f"{name}: rule types {types}, a ruleset requiring nothing gates nothing and the "
-            "context gate below would iterate an empty set"
-        )
-
-
-def test_a_committed_ruleset_requires_at_least_one_context() -> None:
-    for name, doc in ruleset_docs().items():
-        contexts = required_contexts(doc)
-        assert contexts != [], (
-            f"{name}: empty required-context list, the context gate would pass on an empty set"
-        )
-        for context in contexts:
-            assert context, f"{name}: a required-status-checks entry carries an empty context"
+        problem = shape_problem(doc)
+        assert problem is None, f".github/rulesets/{name}.json: {problem}"
 
 
 def test_required_contexts_finds_a_context_it_is_given() -> None:
@@ -122,6 +99,56 @@ def _cannot_be_required(ruleset_name: str, context: str, reason: str) -> str:
     )
 
 
+def test_a_call_that_switches_a_check_off_cannot_judge_the_context_it_composes() -> None:
+    # The half `skips_under` documents in prose and no gate held: `conventional-commits` says of its own
+    # `check-title` input that switching it off skips the job and a skipped job reports success. The
+    # composer reads the caller's `with:` against the called job's `if:`, so the prose is now a gate.
+    reason = switched_off(
+        {"uses": "$/.github/workflows/conventional-commits.yml", "with": {"check-title": False}},
+        "conventional-commits",
+        "pr-title",
+    )
+    assert reason is not None
+    assert "check-title" in reason
+    assert "pr-title" in reason
+
+
+def test_a_call_that_leaves_a_check_at_its_default_judges_normally() -> None:
+    for given in ({}, {"check-title": True}, {"timeout-minutes": 5}):
+        assert (
+            switched_off(
+                {"uses": "$/.github/workflows/conventional-commits.yml", "with": given},
+                "conventional-commits",
+                "pr-title",
+            )
+            is None
+        )
+
+
+def test_an_input_that_gates_no_job_switches_nothing_off() -> None:
+    # `types` appears in no job's `if:`, so passing it changes nothing about whether the job judges.
+    assert (
+        switched_off(
+            {"uses": "$/.github/workflows/conventional-commits.yml", "with": {"types": "feat"}},
+            "conventional-commits",
+            "pr-title",
+        )
+        is None
+    )
+
+
+def test_an_expression_valued_switch_is_refused_because_it_cannot_be_resolved_offline() -> None:
+    reason = switched_off(
+        {
+            "uses": "$/.github/workflows/conventional-commits.yml",
+            "with": {"check-commits": "${{ github.event_name == 'pull_request' }}"},
+        },
+        "conventional-commits",
+        "commit-messages",
+    )
+    assert reason is not None
+
+
 def test_no_required_context_can_skip_under_the_event_it_would_gate() -> None:
     cannot_judge = {c.context: c.cannot_judge for c in composed_contexts()}
     for name, doc in ruleset_docs().items():
@@ -142,7 +169,7 @@ def test_the_cannot_be_required_message_quotes_the_reason() -> None:
 def test_a_context_the_tree_composes_but_does_not_require_causes_no_failure() -> None:
     # Not every check is a gate. Requiring more is a maintainer's decision, not this gate's —
     # spec.md Story 2, scenario 4. `advisory / prek-advisory` is composed and, deliberately, is not
-    # in the eight becoming three: its presence here asserts nothing failed above it.
+    # in the required list: its presence here asserts nothing failed above it.
     composed = {c.context for c in composed_contexts()}
     required = {context for doc in ruleset_docs().values() for context in required_contexts(doc)}
     assert "advisory / prek-advisory" in composed - required

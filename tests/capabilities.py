@@ -1,4 +1,5 @@
 import json
+import re
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
@@ -12,13 +13,11 @@ ACTION_DIR = REPO / "actions"
 RULESET_DIR = REPO / ".github" / "rulesets"
 FIXTURE = Path(__file__).parent / "published_surface.toml"
 
-# The six fields a write to the rulesets API accepts. Anything else on a committed file is a
-# validation failure, not an ignored one — a misspelled field would otherwise read as an absent one.
-WRITABLE_FIELDS = frozenset(
-    {"name", "target", "enforcement", "conditions", "rules", "bypass_actors"}
-)
-
 Doc = dict[Any, Any]
+
+# A called job's `if:` names the inputs that gate it. Reading them out of the condition is what lets a
+# caller's `with:` be judged against it, rather than trusting prose in the input's description.
+INPUT_REF = re.compile(r"inputs\.([A-Za-z0-9_-]+)")
 
 # A workflow's `on:` key is YAML 1.1's `true`, so a parser hands it back as the boolean and every
 # lookup by the string finds nothing. Both spellings are read, because which one arrives depends on
@@ -121,6 +120,29 @@ def _cannot_judge(job: Doc, wf_triggers: Doc, capability: str | None) -> str | N
     return None
 
 
+def switched_off(job: Doc, capability: str | None, called_job: str) -> str | None:
+    # The caller's own `with:` read against the called job's `if:`. A capability whose input switches a
+    # check off skips that job, and a skipped job reports success — so the context it composes stops
+    # judging while still reporting green. Anything but the default or a literal `true` is refused: an
+    # expression cannot be resolved offline, so it is not provably on either.
+    if capability is None:
+        return None
+    doc = workflow_docs().get(capability)
+    if doc is None:
+        return None
+    given = cast(Doc, job.get("with") or {})
+    for job_id, called in jobs(doc).items():
+        if not isinstance(called, dict) or str(cast(Doc, called).get("name", job_id)) != called_job:
+            continue
+        for name in INPUT_REF.findall(str(cast(Doc, called).get("if", ""))):
+            if name in given and given[name] is not True:
+                return (
+                    f"the call passes {name}: {given[name]!r}, and {capability}'s {called_job} job is "
+                    f"gated on inputs.{name} — a skipped job reports success"
+                )
+    return None
+
+
 def composed_contexts() -> list[ComposedContext]:
     # Reads only caller workflows — a capability's own jobs are not what a ruleset can require.
     out: list[ComposedContext] = []
@@ -144,7 +166,7 @@ def composed_contexts() -> list[ComposedContext]:
                             workflow=wf_name,
                             job=job_id,
                             calls=capability,
-                            cannot_judge=cannot_judge,
+                            cannot_judge=cannot_judge or switched_off(job, capability, called_job),
                         )
                     )
             else:
