@@ -251,26 +251,33 @@ can fail.
 **Purpose**: the tree now says something the documentation contradicts. Stale framing is a defect, not a
 follow-up.
 
-- [ ] T028 `docs/ai-instructions.md`, the CI section at line 165. Its claim that **"nothing in the tree can
-      see it"** is now false, and the instruction it justifies has become a gate. Rewrite it to name
-      `.github/rulesets/` as the owner and the gate as what holds it. Drop the "Two names are never
-      required" list in the same edit: the gate owns that fact now, and a prose copy of it is the second
-      owner principle I forbids.
-- [ ] T029 [P] `AGENTS.md`, the layer 3 table. Add a row for `.github/rulesets/` — "what the default
+- [X] T028 `docs/ai-instructions.md`, the CI section's claim that **"nothing in the tree can see it"**
+      (not "line 165" as originally written here — that line number named the section's opening
+      sentence, not the false claim, which sits two lines below it; a citation that drifts with the
+      first edit it prompts is the wrong kind of precision, so the fix is quoted by text instead). The
+      claim is now false, and the instruction it justifies has become a gate. Rewritten to name
+      `.github/rulesets/` as the owner and `tests/test_ruleset_contexts.py` as the gate that holds it.
+      Dropped the "Two names are never required" list in the same edit: `published_surface.toml`'s
+      `judges` field and the gate own that fact now, and a prose copy of it is the second owner
+      principle I forbids.
+- [X] T029 [P] `AGENTS.md`, the layer 3 table. Add a row for `.github/rulesets/` — "what the default
       branch requires, and what a consumer's ruleset would require of it". Nothing else in that table
       answers it.
-- [ ] T030 [P] Check `README.md` and expect no change: it describes what a consumer resolves, and neither
+- [X] T030 [P] Check `README.md` and expect no change: it describes what a consumer resolves, and neither
       the applier nor the action is published ([FR-014](./spec.md#functional-requirements)). Its existing
       statements about retiring a context are consumer-facing and stay true. Say so in the pull request
       rather than editing to prove the check happened.
-- [ ] T031 Check `docs/technical-debt.md` and expect no row. R2's departure from the schema convention is
+- [X] T031 Check `docs/technical-debt.md` and expect no row. R2's departure from the schema convention is
       a settled decision with its reason recorded beside what enforces it (T006), not a shortcut nobody
       will fix — and the doc's own admission bar requires all three of its conditions.
-- [ ] T032 `mise run ci` with the network unavailable, confirming
+- [X] T032 `mise run ci` with the network unavailable, confirming
       [SC-003](./spec.md#measurable-outcomes). Not "it passed on a machine with wifi".
-- [ ] T033 Walk [quickstart.md](./quickstart.md) end to end and correct anything it gets wrong about the
-      code as built — including the `composed_contexts()` snippet, which was written before the composer
-      was.
+- [X] T033 Walk [quickstart.md](./quickstart.md) end to end and correct anything it gets wrong about the
+      code as built. The `composed_contexts()` snippet already matched the built composer; what had gone
+      stale was the count (eight contexts → nine, once `apply-ruleset.yml` joined the tree), the
+      `prek-advisory` proof's expected reason (it quoted a `skips_under` sentence; the actual reason now
+      comes from `judges = false`, per the Phase 5 fix), and both `gh workflow run apply-ruleset.yml`
+      examples, which omitted the now-required `ruleset` input.
 
 ---
 

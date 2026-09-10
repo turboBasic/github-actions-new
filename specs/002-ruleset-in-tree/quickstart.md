@@ -19,7 +19,7 @@ cat .github/rulesets/protect-default-branch.json
 
 ## Read what the tree composes
 
-Eight contexts, three of them safe to require. The composer is in `tests/capabilities.py`
+Nine contexts, three of them safe to require. The composer is in `tests/capabilities.py`
 ([R6](./research.md#r6--the-gates-two-halves)).
 
 ```bash
@@ -59,8 +59,9 @@ Then prove the other half — a context that resolves but cannot judge (FR-009, 
 uv run pytest tests/test_ruleset_contexts.py
 ```
 
-Expected: a failure quoting `prek-advisory`'s own recorded skip reason from
-`tests/published_surface.toml`. Undo the edit.
+Expected: a failure whose reason is `prek-advisory never judges what it names; the run may report
+success without checking anything` — set by `judges = false` in `tests/published_surface.toml`, not by
+its `skips_under` entry. Undo the edit.
 
 ## The decision unit
 
@@ -80,11 +81,11 @@ Two dispatches, and the first writes nothing — SC-004, SC-005.
 ```bash
 # 1. See what would change. Writes nothing.
 GH_TOKEN=$(gh auth token -u turboBasic) gh workflow run apply-ruleset.yml \
-  --repo turboBasic/github-actions-new
+  --repo turboBasic/github-actions-new -f ruleset=protect-default-branch
 
 # 2. Having read the difference, write it.
 GH_TOKEN=$(gh auth token -u turboBasic) gh workflow run apply-ruleset.yml \
-  --repo turboBasic/github-actions-new -f dry-run=false
+  --repo turboBasic/github-actions-new -f ruleset=protect-default-branch -f dry-run=false
 ```
 
 On this feature's own first dispatch, expect **nothing to change** — the committed file reproduces the live

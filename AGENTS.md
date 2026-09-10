@@ -38,5 +38,6 @@ and reaches the rule layers by link. Layer 3 is read on demand by both.
 | `pyproject.toml` | the Python dependencies, the tool settings, and the released version |
 | `.pre-commit-config.yaml` | the prek hooks |
 | `.github/workflows/ci.yml` | which gates run on a pull request |
+| `.github/rulesets/` | what the default branch requires, and what a consumer's ruleset would require of it |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | what a report or a proposal has to carry |
 | `.yamllint.yaml`, `.cspell.config.yaml`, `.markdownlint-cli2.jsonc`, `.taplo.toml` | each linter's own rules and exemptions |
