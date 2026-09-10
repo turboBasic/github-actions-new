@@ -1,3 +1,4 @@
+import json
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
@@ -8,7 +9,14 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOW_DIR = REPO / ".github" / "workflows"
 ACTION_DIR = REPO / "actions"
+RULESET_DIR = REPO / ".github" / "rulesets"
 FIXTURE = Path(__file__).parent / "published_surface.toml"
+
+# The six fields a write to the rulesets API accepts. Anything else on a committed file is a
+# validation failure, not an ignored one — a misspelled field would otherwise read as an absent one.
+WRITABLE_FIELDS = frozenset(
+    {"name", "target", "enforcement", "conditions", "rules", "bypass_actors"}
+)
 
 Doc = dict[Any, Any]
 
@@ -30,6 +38,21 @@ def workflow_docs() -> dict[str, Doc]:
 
 def action_docs() -> dict[str, Doc]:
     return {path.parent.name: load(path) for path in sorted(ACTION_DIR.glob("*/action.yml"))}
+
+
+def ruleset_docs() -> dict[str, Doc]:
+    return {
+        path.stem: cast(Doc, json.loads(path.read_text(encoding="utf-8")))
+        for path in sorted(RULESET_DIR.glob("*.json"))
+    }
+
+
+def required_contexts(doc: Doc) -> list[str]:
+    for rule in cast(list[Doc], doc.get("rules", [])):
+        if rule.get("type") == "required_status_checks":
+            checks = cast(list[Doc], rule.get("parameters", {}).get("required_status_checks", []))
+            return [str(check["context"]) for check in checks]
+    return []
 
 
 def workflow_paths() -> list[Path]:

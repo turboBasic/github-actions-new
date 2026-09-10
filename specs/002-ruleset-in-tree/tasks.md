@@ -83,21 +83,21 @@ to prevent, reappearing inside it.
 
 **⚠️ No user story work begins until this phase is complete.**
 
-- [ ] T004 In `tests/capabilities.py` — already the one owner of how a workflow is read — add
+- [X] T004 In `tests/capabilities.py` — already the one owner of how a workflow is read — add
       `RULESET_DIR = REPO / ".github" / "rulesets"`, `ruleset_docs() -> dict[str, Doc]` keyed by file stem,
       `WRITABLE_FIELDS`, and `required_contexts(doc) -> list[str]` reading
       `rules[type == required_status_checks].parameters.required_status_checks[].context`. Full type hints;
       `json.loads`, not a new dependency.
-- [ ] T005 In `tests/test_ruleset_contexts.py` (new), the [FR-012](./spec.md#functional-requirements)
+- [X] T005 In `tests/test_ruleset_contexts.py` (new), the [FR-012](./spec.md#functional-requirements)
       assertions from [data-model.md](./data-model.md#validation-fr-012): the key set is exactly
       `WRITABLE_FIELDS`; exactly one rule is `required_status_checks`; its context list is non-empty and
       every entry has a non-empty `context`; `target` is `branch`.
-- [ ] T006 In the same file, record beside those assertions why there is no `check-jsonschema` hook —
+- [X] T006 In the same file, record beside those assertions why there is no `check-jsonschema` hook —
       [R2](./research.md#r2--no-schema-hook) in two or three lines, stating the rule and not the history:
       the tool ships no ruleset schema, a remote one would put the network in `mise run ci`, and unlike
       `.github/actionlint.yaml` a mis-keyed field here fails *green* rather than safe. JSON carries no
       comments, so this is the only place the reason can live next to what enforces it.
-- [ ] T007 Pre-flight `required_contexts()` against a literal built in the test, per the conventions
+- [X] T007 Pre-flight `required_contexts()` against a literal built in the test, per the conventions
       layer: a reader that silently stops matching reports green over a file full of retired names. Assert
       it finds a context it is given, and returns `[]` for a ruleset with no such rule.
 
