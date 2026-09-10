@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Shipped in v0.1.0
 
 **Input**: User description: "Specify the consumer contract this repository is to provide: reusable GitHub Actions workflows and composite actions for turboBasic repositories. Derive it from the functional behaviour of ../github-actions, read only from .github/workflows/*.yml, actions/*/action.yml and the Python those actions run, plus README.md as the advertised contract."
 
