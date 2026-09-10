@@ -1,13 +1,9 @@
 name: apply-ruleset
 
-# A ruleset is administrative surface with no revert once written, so a write only ever runs by hand. It
-# defaults to a dry run: the difference between the committed file and the live ruleset always prints
-# before anything is written, so a person reads it before choosing to proceed.
-#
-# The schedule writes nothing and cannot: the write step is reachable from `workflow_dispatch` alone
-# (FR-003). It exists because the tree is only authoritative if something notices when GitHub stops
-# matching it — a hand edit in the UI is otherwise invisible until the next dispatch, which may be
-# months away. So the scheduled run reads, and fails on any difference.
+# A ruleset write has no revert, so it runs by hand and dry by default: the difference always prints
+# before anything is written. The schedule only reads — the write step is reachable from
+# `workflow_dispatch` alone (FR-003) — and fails on any difference, because a hand edit in the UI is
+# otherwise invisible until someone next dispatches.
 on:
   workflow_dispatch:
     inputs:
@@ -84,11 +80,12 @@ jobs:
         with:
           client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # The App behind these secrets must hold this, and its installation must have accepted it: a
+          # permission added to an App does not reach an installation until the account owner approves.
           permission-administration: write # the only right a ruleset read or write needs (R8)
 
-      # Every repository-owned ruleset in full, because the list endpoint's summary carries no rules,
-      # conditions or bypass_actors. `includes_parents=false` is what leaves out an organisation's,
-      # which this repository could not write even if it matched a committed name.
+      # In full, because a list-endpoint summary carries no rules, conditions or bypass_actors.
+      # `includes_parents=false` leaves out an organisation's, which this repository cannot write.
       - name: Read the live rulesets in full
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
@@ -134,8 +131,8 @@ jobs:
             gh api -X PUT "repos/$GH_REPO/rulesets/$RULESET_ID" --input "$BODY"
           fi
 
-      # The drift alarm. A dispatch exits successfully on a difference — that is the reason to dispatch
-      # — but a scheduled run finding one means GitHub stopped matching the tree with nobody watching.
+      # A dispatch exits successfully on a difference, since that is the reason to dispatch. A scheduled
+      # run finding one means GitHub stopped matching the tree with nobody watching.
       - id: drift
         name: Fail on drift
         if: github.event_name == 'schedule' && steps.decide.outputs.verdict != 'nothing'

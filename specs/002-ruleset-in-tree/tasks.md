@@ -163,10 +163,16 @@ nothing written; dispatch again with the dry run off and read the change back fr
       `pyproject.toml` — same reason as T012, and the same reason every other caller workflow of this
       repository is already listed there. (Already present from the proactive T012 edit; confirmed still
       correct once the workflow file existed.)
-- [ ] T017 [US1] Verify by dispatch, in dry run, after the branch has merged:
+- [X] T017 [US1] Verify by dispatch, in dry run, after the branch has merged:
       `gh workflow run apply-ruleset.yml`. Expect **nothing to change**
       ([R10](./research.md#r10--what-the-first-apply-must-not-change)). A difference means T001 was
       transcribed wrong — read it and do not proceed to a real dispatch.
+
+      Run `34533773004`: nothing to change, write skipped. The Assumption that the App already held
+      `administration: write` was wrong; it was granted and accepted first.
+
+      `create` and `update` were exercised afterwards, beyond this phase, against a `disabled` scratch
+      ruleset targeting no existing branch — each verified field-for-field, then deleted.
 
 **Checkpoint**: applying works and is a no-op. Nothing has been written to GitHub.
 

@@ -2,15 +2,14 @@ from rulesets import shape_problem
 
 from capabilities import Doc, composed_contexts, required_contexts, ruleset_docs, switched_off
 
-# No check-jsonschema hook covers this file: the tool ships no schema for a repository ruleset, and
-# a `--schemafile <url>` would put the network in `mise run ci`. A mis-keyed required-status-checks
-# block would otherwise leave this gate reading zero required contexts and passing on an empty set —
-# a green gate that judged nothing — so the shape is asserted here instead, where that failure mode
-# is exactly what is being guarded against.
+# No check-jsonschema hook covers a committed ruleset: the tool ships no schema for one, and a
+# `--schemafile <url>` would put the network in `mise run ci`. The shape is asserted here instead,
+# because a mis-keyed required-status-checks block leaves the context gates below reading an empty set
+# and passing on it. `shape_problem` is the one owner of that shape; the applier refuses on the same
+# call, and test_ruleset_decisions.py holds what each refusal says.
 #
-# `shape_problem` is the one owner of that shape, and the applier refuses on the same call. A second
-# implementation here would be two answers to what a write accepts; test_ruleset_decisions.py holds
-# what each refusal says.
+# Every reader below is pre-flighted, by name against the tree or against a document it is given: a
+# reader that silently stops matching reports green over a file full of retired names.
 
 
 def test_every_committed_ruleset_is_a_shape_a_write_accepts() -> None:
@@ -20,8 +19,6 @@ def test_every_committed_ruleset_is_a_shape_a_write_accepts() -> None:
 
 
 def test_required_contexts_finds_a_context_it_is_given() -> None:
-    # Pre-flight the reader, or a change that stops it matching reports green over a file full of
-    # retired names — the conventions layer's rule for a table reader, applied to this one.
     given: Doc = {
         "rules": [
             {
@@ -38,9 +35,7 @@ def test_required_contexts_returns_nothing_for_a_ruleset_with_no_such_rule() -> 
 
 
 def test_composed_contexts_finds_the_contexts_the_tree_actually_reports() -> None:
-    # Pre-flight the composer against the tree by name, per the conventions layer: a composer that
-    # stops reading `uses:` would otherwise report green over every retired name at once. These four
-    # are confirmed against this repository's own reported check-run names, not guessed.
+    # These four are confirmed against this repository's own reported check-run names, not guessed.
     contexts = {c.context for c in composed_contexts()}
     assert "ci / python-ci" in contexts
     assert "commits / pr-title" in contexts
@@ -75,9 +70,7 @@ def test_the_unresolved_message_names_the_ruleset_the_context_and_what_to_do() -
 
 
 def test_cannot_judge_is_set_by_name_for_the_contexts_that_cannot_be_required() -> None:
-    # Pre-flight against the tree by name: each reason has a different cause, and a composer that
-    # stops reading any one of them would report green over exactly the context that reason exists
-    # to catch.
+    # One context per reason, so dropping any single reason fails here rather than only where it counts.
     by_context = {c.context: c.cannot_judge for c in composed_contexts()}
     assert by_context["advisory / prek-advisory"] is not None
     assert by_context["describe / pr-description"] is not None
@@ -89,9 +82,8 @@ def test_cannot_judge_is_set_by_name_for_the_contexts_that_cannot_be_required() 
 
 
 def _cannot_be_required(ruleset_name: str, context: str, reason: str) -> str:
-    # FR-009, principle VII made structural: a required context that reports green without judging
-    # anything is a required gate nobody would ever see fail. The reason is quoted, not summarised,
-    # so the message is the record of why this one is exempt.
+    # FR-009, principle VII made structural. The reason is quoted rather than summarised, so the
+    # message says which of the several causes applied.
     return (
         f"{ruleset_name} requires {context!r}, which cannot judge anything: {reason}. "
         f"Remove it from .github/rulesets/{ruleset_name}.json — a required gate never passes "
@@ -100,9 +92,6 @@ def _cannot_be_required(ruleset_name: str, context: str, reason: str) -> str:
 
 
 def test_a_call_that_switches_a_check_off_cannot_judge_the_context_it_composes() -> None:
-    # The half `skips_under` documents in prose and no gate held: `conventional-commits` says of its own
-    # `check-title` input that switching it off skips the job and a skipped job reports success. The
-    # composer reads the caller's `with:` against the called job's `if:`, so the prose is now a gate.
     reason = switched_off(
         {"uses": "$/.github/workflows/conventional-commits.yml", "with": {"check-title": False}},
         "conventional-commits",
@@ -167,9 +156,7 @@ def test_the_cannot_be_required_message_quotes_the_reason() -> None:
 
 
 def test_a_context_the_tree_composes_but_does_not_require_causes_no_failure() -> None:
-    # Not every check is a gate. Requiring more is a maintainer's decision, not this gate's —
-    # spec.md Story 2, scenario 4. `advisory / prek-advisory` is composed and, deliberately, is not
-    # in the required list: its presence here asserts nothing failed above it.
+    # Not every check is a gate: requiring more is a maintainer's decision, not this gate's.
     composed = {c.context for c in composed_contexts()}
     required = {context for doc in ruleset_docs().values() for context in required_contexts(doc)}
     assert "advisory / prek-advisory" in composed - required
