@@ -44,17 +44,24 @@ jobs:
         with:
           persist-credentials: false
 
+      # An empty matrix skips the job below, and a skipped job reports success — so a scheduled run that
+      # listed nothing would be a green check that read no ruleset at all. It fails here instead.
       - id: list
         env:
           NAMED: ${{ inputs.ruleset }}
         run: |
           if [ -n "$NAMED" ]; then
-            jq -cn --arg one "$NAMED" '{rulesets: [$one]}'
+            names=$(jq -cn --arg one "$NAMED" '[$one]')
           else
-            find .github/rulesets -name '*.json' -printf '%f\n' \
+            names=$(find .github/rulesets -name '*.json' -printf '%f\n' \
               | sed 's/\.json$//' \
-              | jq -Rcn '{rulesets: [inputs]}'
-          fi | jq -r 'to_entries[] | "\(.key)=\(.value | tojson)"' >> "$GITHUB_OUTPUT"
+              | jq -Rcn '[inputs]')
+          fi
+          if [ "$(jq 'length' <<< "$names")" -eq 0 ]; then
+            echo "::error::no committed ruleset to read under .github/rulesets"
+            exit 1
+          fi
+          printf 'rulesets=%s\n' "$names" >> "$GITHUB_OUTPUT"
 
   apply:
     name: apply
