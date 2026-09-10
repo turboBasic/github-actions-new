@@ -1,0 +1,51 @@
+name: ruleset-decisions
+description: >-
+  Answers what to do with a committed ruleset given the live rulesets on the repository — create,
+  update, do nothing, or refuse. Internal surface: it carries no stability promise and composes no check
+  name. Performs no write and reads no network; every HTTP call is the workflow's.
+
+inputs:
+  committed:
+    description: Path to the committed ruleset JSON.
+    required: true
+  live:
+    description: >-
+      Path to a JSON array of every repository-owned ruleset as `GET
+      /repos/{owner}/{repo}/rulesets/{id}` returns it. The list endpoint's summaries will not do: they
+      carry no rules, conditions or bypass_actors, so nothing could be compared.
+    required: true
+  body-path:
+    description: Where to write the body to send, for create or update. Absent otherwise.
+    required: false
+    default: ""
+
+outputs:
+  verdict:
+    description: nothing, create, update or refuse.
+    value: ${{ steps.decide.outputs.verdict }}
+  ruleset-id:
+    description: The live ruleset's id, for update. Empty otherwise.
+    value: ${{ steps.decide.outputs.ruleset-id }}
+  difference:
+    description: Field by field, both sides. Empty only for nothing.
+    value: ${{ steps.decide.outputs.difference }}
+  body:
+    description: Path to the JSON to send. Written for create and update.
+    value: ${{ steps.decide.outputs.body }}
+  message:
+    description: What was read, what it was compared against, and what to do about it.
+    value: ${{ steps.decide.outputs.message }}
+
+runs:
+  using: composite
+  steps:
+    # Every value reaches the module as an environment value, never interpolated into a command line —
+    # a committed file's path is chosen by this repository, but the live and detail bodies it is
+    # compared against are text this workflow read from an API response.
+    - id: decide
+      shell: bash
+      env:
+        COMMITTED: ${{ inputs.committed }}
+        LIVE: ${{ inputs.live }}
+        BODY_PATH: ${{ inputs.body-path || format('{0}/ruleset-body.json', runner.temp) }}
+      run: python3 "$GITHUB_ACTION_PATH/rulesets.py"

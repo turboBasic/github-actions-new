@@ -43,11 +43,11 @@ ignore = ["E501"] # line length is the formatter's job
 
 [tool.pyright]
 include = ["actions", "tests"]
-# Two modules the tests import by bare name: `tests/capabilities.py`, the one owner of how a workflow
-# is read, and the decision unit, which lives beside the action that runs it. pytest reaches the first
-# by the test file's own directory and the second through `tests/conftest.py`; pyright needs both
-# directories named here to resolve either import.
-extraPaths = ["tests", "actions/release-decisions"]
+# Modules the tests import by bare name: `tests/capabilities.py`, the one owner of how a workflow is
+# read, and each decision unit, which lives beside the action that runs it. pytest reaches the first by
+# the test file's own directory and the rest through `tests/conftest.py`; pyright needs every directory
+# named here to resolve any of them.
+extraPaths = ["tests", "actions/release-decisions", "actions/ruleset-decisions"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
@@ -64,11 +64,13 @@ addopts = ["-ra"]
 include = [".github/workflows", "actions"]
 exclude = [
   ".github/workflows/advisory.yml",
+  ".github/workflows/apply-ruleset.yml",
   ".github/workflows/ci.yml",
   ".github/workflows/commit-messages.yml",
   ".github/workflows/describe-pr.yml",
   ".github/workflows/release-on-merge.yml",
   ".github/workflows/release-proposal.yml",
+  "actions/ruleset-decisions",
 ]
 
 [tool.commitizen]

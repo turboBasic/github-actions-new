@@ -23,9 +23,13 @@
 #   tool_prerequisites  tools the capability invokes that the consumer's own configuration must pin.
 #                       Empty when the capability provisions its own.
 #   skips_under         every event-conditional job-level `if:`, as `{ jobs, event, reason }`. One
-#                       entry may cover several jobs that skip for the same reason; `jobs` is what
-#                       makes the gate per-job, since a skipped job reports success and an unreasoned
-#                       skip is a required check that passes without reading anything.
+#                       entry may cover several jobs that skip for the same reason. Documentation of
+#                       the condition, not itself a reason to refuse a required context: a caller that
+#                       only ever fires under the one event the job does not skip is unaffected by it.
+#   judges              false marks a capability whose job goes green without judging what it names —
+#                       advisory (reports success regardless of findings) or write-only (nothing to
+#                       pass or fail). Absent means true. This is what a required context is refused
+#                       for; `skips_under` alone is not enough to tell the two apart.
 #
 # Each row arrives in the same change as the capability it describes.
 
@@ -71,6 +75,8 @@ reason = "there is no title and no range to judge; a consumer must not require t
 kind = "workflow"
 published = true
 check_name = ["pr-description"]
+# It renders a body; there is no criterion by which that render passes or fails.
+judges = false
 # Two inputs and nothing else. No token, no pull request number, no repository, no SHA range: the
 # capability owns its own checkout and reads all of it from the run, which is what removes the
 # shallow-checkout failure mode rather than documenting it.
@@ -99,6 +105,8 @@ skips_under = []
 kind = "workflow"
 published = true
 check_name = ["prek-advisory"]
+# Its own lint step swallows a non-zero exit; the job reports success whether or not it found anything.
+judges = false
 # No cache-prek: caching is unconditional. No mise-version: six call sites could have set it and none
 # did, and removing an input is a break where never adding one is not.
 inputs = ["hook-stage", "timeout-minutes"]
@@ -115,6 +123,16 @@ tool_prerequisites = [
 jobs = ["prek-advisory"]
 event = "any event but pull_request"
 reason = "there is no pull request to comment on. This capability is advertised as advisory rather than as a required gate, which is why principle VII exempts it by name — a consumer that requires this context has misread what it is for"
+
+[ruleset-decisions]
+kind = "action"
+# Internal surface, for the same reason release-decisions is: no stability promise, no check name, and
+# inputs nothing outside this repository names.
+published = false
+inputs = []
+permissions = {}
+tool_prerequisites = []
+skips_under = []
 
 [release-decisions]
 kind = "action"

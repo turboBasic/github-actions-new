@@ -1,0 +1,146 @@
+name: apply-ruleset
+
+# A ruleset is administrative surface with no revert once written, so a write only ever runs by hand. It
+# defaults to a dry run: the difference between the committed file and the live ruleset always prints
+# before anything is written, so a person reads it before choosing to proceed.
+#
+# The schedule writes nothing and cannot: the write step is reachable from `workflow_dispatch` alone
+# (FR-003). It exists because the tree is only authoritative if something notices when GitHub stops
+# matching it — a hand edit in the UI is otherwise invisible until the next dispatch, which may be
+# months away. So the scheduled run reads, and fails on any difference.
+on:
+  workflow_dispatch:
+    inputs:
+      ruleset:
+        description: Name of the committed file under .github/rulesets, without the .json suffix.
+        required: true
+      dry-run:
+        description: Print the difference and stop before writing.
+        type: boolean
+        default: true
+  schedule:
+    - cron: "17 6 * * 1" # Monday morning, so a week's drift is read at the start of a week
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  # Which committed rulesets this run is about: the one the dispatch named, or every file in the tree
+  # when nothing named one. Hardcoding a name for the scheduled path would fork the fact that
+  # `.github/rulesets/` owns — which rulesets exist — so the directory is read instead.
+  which:
+    name: which
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # the checkout, to list the committed files
+    outputs:
+      rulesets: ${{ steps.list.outputs.rulesets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # An empty matrix skips the job below, and a skipped job reports success — so a scheduled run that
+      # listed nothing would be a green check that read no ruleset at all. It fails here instead.
+      - id: list
+        env:
+          NAMED: ${{ inputs.ruleset }}
+        run: |
+          if [ -n "$NAMED" ]; then
+            names=$(jq -cn --arg one "$NAMED" '[$one]')
+          else
+            names=$(find .github/rulesets -name '*.json' -printf '%f\n' \
+              | sed 's/\.json$//' \
+              | jq -Rcn '[inputs]')
+          fi
+          if [ "$(jq 'length' <<< "$names")" -eq 0 ]; then
+            echo "::error::no committed ruleset to read under .github/rulesets"
+            exit 1
+          fi
+          printf 'rulesets=%s\n' "$names" >> "$GITHUB_OUTPUT"
+
+  apply:
+    name: apply
+    needs: which
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # the checkout, to read the committed file
+    strategy:
+      fail-fast: false # one ruleset's refusal must not hide another's difference
+      matrix:
+        ruleset: ${{ fromJSON(needs.which.outputs.rulesets) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-administration: write # the only right a ruleset read or write needs (R8)
+
+      # Every repository-owned ruleset in full, because the list endpoint's summary carries no rules,
+      # conditions or bypass_actors. `includes_parents=false` is what leaves out an organisation's,
+      # which this repository could not write even if it matched a committed name.
+      - name: Read the live rulesets in full
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPO/rulesets?includes_parents=false" --jq '.[].id' \
+            | while read -r id; do gh api "repos/$GH_REPO/rulesets/$id"; done \
+            | jq -sc '.' > "$RUNNER_TEMP/live.json"
+
+      - id: decide
+        continue-on-error: true
+        uses: $/actions/ruleset-decisions
+        with:
+          committed: .github/rulesets/${{ matrix.ruleset }}.json
+          live: ${{ runner.temp }}/live.json
+
+      - name: Print the difference
+        env:
+          DIFFERENCE: ${{ steps.decide.outputs.difference }}
+        run: printf '%s\n' "$DIFFERENCE"
+
+      - name: Refuse
+        if: steps.decide.outcome == 'failure'
+        run: exit 1
+
+      # `inputs.dry-run` is absent on a scheduled run, and an absent input compares equal to `false` —
+      # so the event is named first. A schedule reads and never writes (FR-003).
+      - name: Write the ruleset
+        if: >-
+          github.event_name == 'workflow_dispatch' && steps.decide.outcome == 'success' &&
+          !inputs.dry-run &&
+          (steps.decide.outputs.verdict == 'create' || steps.decide.outputs.verdict == 'update')
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          VERDICT: ${{ steps.decide.outputs.verdict }}
+          RULESET_ID: ${{ steps.decide.outputs.ruleset-id }}
+          BODY: ${{ steps.decide.outputs.body }}
+        run: |
+          if [ "$VERDICT" = create ]; then
+            gh api "repos/$GH_REPO/rulesets" --input "$BODY"
+          else
+            gh api -X PUT "repos/$GH_REPO/rulesets/$RULESET_ID" --input "$BODY"
+          fi
+
+      # The drift alarm. A dispatch exits successfully on a difference — that is the reason to dispatch
+      # — but a scheduled run finding one means GitHub stopped matching the tree with nobody watching.
+      - id: drift
+        name: Fail on drift
+        if: github.event_name == 'schedule' && steps.decide.outputs.verdict != 'nothing'
+        env:
+          MESSAGE: ${{ steps.decide.outputs.message }}
+        run: |
+          printf '::error::live ruleset no longer matches the tree: %s\n' "$MESSAGE"
+          exit 1

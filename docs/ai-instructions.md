@@ -164,12 +164,10 @@ Python 3.14. The only Python here supports the actions and their tests.
 
 `mise run ci` reproduces CI locally.
 
-**This repository's own branch ruleset is a consumer of its own check names, and nothing in the tree can
-see it.** Renaming a job, removing one, or making a job conditional changes what reports — so the same
-change edits the ruleset's required contexts. The rule is principle IV's, and the README already states
-it for consumers; it binds here too, and forgetting it is not a small mistake. A required context that
-no longer reports blocks every pull request in this repository, and the only symptom is a check that
-never appears.
-
-Two names are never required: `advisory / prek-advisory`, which is advertised as advisory and reports
-green whether or not it found anything, and any context from a capability whose job can skip.
+**This repository's own branch ruleset is a consumer of its own check names, and `.github/rulesets/`
+is where it is committed.** `tests/test_ruleset_contexts.py` is what holds it: renaming a job, retiring
+a workflow, or making a job conditional changes what a required context there composes to, and the gate
+fails the pull request that does it, naming the ruleset, the context, and what to edit. The rule is
+principle IV's, and the README already states it for consumers; it binds here too, and forgetting it is
+not a small mistake. A required context that no longer reports blocks every pull request in this
+repository, and the only symptom is a check that never appears.

@@ -1,16 +1,23 @@
+import json
+import re
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOW_DIR = REPO / ".github" / "workflows"
 ACTION_DIR = REPO / "actions"
+RULESET_DIR = REPO / ".github" / "rulesets"
 FIXTURE = Path(__file__).parent / "published_surface.toml"
 
 Doc = dict[Any, Any]
+
+# A called job's `if:` names the inputs that gate it. Reading them out of the condition is what lets a
+# caller's `with:` be judged against it, rather than trusting prose in the input's description.
+INPUT_REF = re.compile(r"inputs\.([A-Za-z0-9_-]+)")
 
 # A workflow's `on:` key is YAML 1.1's `true`, so a parser hands it back as the boolean and every
 # lookup by the string finds nothing. Both spellings are read, because which one arrives depends on
@@ -30,6 +37,21 @@ def workflow_docs() -> dict[str, Doc]:
 
 def action_docs() -> dict[str, Doc]:
     return {path.parent.name: load(path) for path in sorted(ACTION_DIR.glob("*/action.yml"))}
+
+
+def ruleset_docs() -> dict[str, Doc]:
+    return {
+        path.stem: cast(Doc, json.loads(path.read_text(encoding="utf-8")))
+        for path in sorted(RULESET_DIR.glob("*.json"))
+    }
+
+
+def required_contexts(doc: Doc) -> list[str]:
+    for rule in cast(list[Doc], doc.get("rules", [])):
+        if rule.get("type") == "required_status_checks":
+            checks = cast(list[Doc], rule.get("parameters", {}).get("required_status_checks", []))
+            return [str(check["context"]) for check in checks]
+    return []
 
 
 def workflow_paths() -> list[Path]:
@@ -68,6 +90,96 @@ def check_names(doc: Doc) -> list[str]:
     # A consumer's required context is its own job id, then the called job's name. Where a job
     # declares no name GitHub falls back to its id, so that is what a consumer would have to require.
     return sorted(str(job.get("name", job_id)) for job_id, job in jobs(doc).items())
+
+
+class ComposedContext(NamedTuple):
+    context: str
+    workflow: str
+    job: str
+    calls: str | None
+    cannot_judge: str | None
+
+
+def _called_capability(uses: str) -> str | None:
+    # Only a job-level `uses:` reaching this repository's own workflows composes a context beyond
+    # its own name — the only place `$/.github/workflows/<name>.yml` can point.
+    prefix = "$/.github/workflows/"
+    if not uses.startswith(prefix):
+        return None
+    return uses.removeprefix(prefix).removesuffix(".yml")
+
+
+def _cannot_judge(job: Doc, wf_triggers: Doc, capability: str | None) -> str | None:
+    if capability is not None and fixture().get(capability, {}).get("judges", True) is False:
+        return f"{capability} never judges what it names; the run may report success without checking anything"
+    if "if" in job:
+        return str(job["if"])
+    if "pull_request" not in wf_triggers:
+        events = ", ".join(str(event) for event in wf_triggers) or "no events"
+        return f"the workflow declares no pull_request trigger, only {events}"
+    return None
+
+
+def switched_off(job: Doc, capability: str | None, called_job: str) -> str | None:
+    # The caller's own `with:` read against the called job's `if:`. A capability whose input switches a
+    # check off skips that job, and a skipped job reports success — so the context it composes stops
+    # judging while still reporting green. Anything but the default or a literal `true` is refused: an
+    # expression cannot be resolved offline, so it is not provably on either.
+    if capability is None:
+        return None
+    doc = workflow_docs().get(capability)
+    if doc is None:
+        return None
+    given = cast(Doc, job.get("with") or {})
+    for job_id, called in jobs(doc).items():
+        if not isinstance(called, dict) or str(cast(Doc, called).get("name", job_id)) != called_job:
+            continue
+        for name in INPUT_REF.findall(str(cast(Doc, called).get("if", ""))):
+            if name in given and given[name] is not True:
+                return (
+                    f"the call passes {name}: {given[name]!r}, and {capability}'s {called_job} job is "
+                    f"gated on inputs.{name} — a skipped job reports success"
+                )
+    return None
+
+
+def composed_contexts() -> list[ComposedContext]:
+    # Reads only caller workflows — a capability's own jobs are not what a ruleset can require.
+    out: list[ComposedContext] = []
+    for wf_name, doc in workflow_docs().items():
+        if is_capability(doc):
+            continue
+        wf_triggers = triggers(doc)
+        for job_id, job in jobs(doc).items():
+            if not isinstance(job, dict):
+                continue
+            job = cast(Doc, job)
+            calling_half = str(job.get("name", job_id))
+            capability = _called_capability(str(job["uses"])) if "uses" in job else None
+            called_names = fixture().get(capability, {}).get("check_name") if capability else None
+            cannot_judge = _cannot_judge(job, wf_triggers, capability)
+            if called_names:
+                for called_job in cast(list[str], called_names):
+                    out.append(
+                        ComposedContext(
+                            context=f"{calling_half} / {called_job}",
+                            workflow=wf_name,
+                            job=job_id,
+                            calls=capability,
+                            cannot_judge=cannot_judge or switched_off(job, capability, called_job),
+                        )
+                    )
+            else:
+                out.append(
+                    ComposedContext(
+                        context=calling_half,
+                        workflow=wf_name,
+                        job=job_id,
+                        calls=capability,
+                        cannot_judge=cannot_judge,
+                    )
+                )
+    return out
 
 
 def declared_inputs(doc: Doc) -> set[str]:
