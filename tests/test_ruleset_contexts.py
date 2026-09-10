@@ -1,4 +1,4 @@
-from capabilities import WRITABLE_FIELDS, Doc, required_contexts, ruleset_docs
+from capabilities import WRITABLE_FIELDS, Doc, composed_contexts, required_contexts, ruleset_docs
 
 # No check-jsonschema hook covers this file: the tool ships no schema for a repository ruleset, and
 # a `--schemafile <url>` would put the network in `mise run ci`. A mis-keyed required-status-checks
@@ -58,3 +58,49 @@ def test_required_contexts_finds_a_context_it_is_given() -> None:
 
 def test_required_contexts_returns_nothing_for_a_ruleset_with_no_such_rule() -> None:
     assert required_contexts({"rules": [{"type": "deletion"}]}) == []
+
+
+def test_composed_contexts_finds_the_contexts_the_tree_actually_reports() -> None:
+    # Pre-flight the composer against the tree by name, per the conventions layer: a composer that
+    # stops reading `uses:` would otherwise report green over every retired name at once. These four
+    # are confirmed against this repository's own reported check-run names, not guessed.
+    contexts = {c.context for c in composed_contexts()}
+    assert "ci / python-ci" in contexts
+    assert "commits / pr-title" in contexts
+    assert "commits / commit-messages" in contexts
+    assert "propose" in contexts
+
+
+def _unresolved(ruleset_name: str, context: str) -> str:
+    # FR-010: names the context, where it is required, and what to do about it. A rename or a
+    # retirement is the same fix either way — edit the committed ruleset in the same change.
+    return (
+        f"{ruleset_name} requires {context!r}, which nothing in the tree composes. A calling job "
+        "was renamed or retired, or the called job's name in published_surface.toml no longer "
+        f"matches. Edit .github/rulesets/{ruleset_name}.json in the same change"
+    )
+
+
+def test_every_required_context_is_composed_by_the_tree() -> None:
+    composed = {c.context for c in composed_contexts()}
+    for name, doc in ruleset_docs().items():
+        for context in required_contexts(doc):
+            assert context in composed, _unresolved(name, context)
+
+
+def test_the_unresolved_message_names_the_ruleset_the_context_and_what_to_do() -> None:
+    # FR-010, asserted on the message content rather than only the failure — an exit code alone is
+    # not a result.
+    message = _unresolved("protect-default-branch", "gates / python-ci")
+    assert "protect-default-branch" in message
+    assert "gates / python-ci" in message
+    assert ".github/rulesets/protect-default-branch.json" in message
+
+
+def test_a_context_the_tree_composes_but_does_not_require_causes_no_failure() -> None:
+    # Not every check is a gate. Requiring more is a maintainer's decision, not this gate's —
+    # spec.md Story 2, scenario 4. `advisory / prek-advisory` is composed and, deliberately, is not
+    # in the eight becoming three: its presence here asserts nothing failed above it.
+    composed = {c.context for c in composed_contexts()}
+    required = {context for doc in ruleset_docs().values() for context in required_contexts(doc)}
+    assert "advisory / prek-advisory" in composed - required

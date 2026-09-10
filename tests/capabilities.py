@@ -2,7 +2,7 @@ import json
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import yaml
 
@@ -91,6 +91,76 @@ def check_names(doc: Doc) -> list[str]:
     # A consumer's required context is its own job id, then the called job's name. Where a job
     # declares no name GitHub falls back to its id, so that is what a consumer would have to require.
     return sorted(str(job.get("name", job_id)) for job_id, job in jobs(doc).items())
+
+
+class ComposedContext(NamedTuple):
+    context: str
+    workflow: str
+    job: str
+    calls: str | None
+    cannot_judge: str | None
+
+
+def _called_capability(uses: str) -> str | None:
+    # Only a job-level `uses:` reaching this repository's own workflows composes a context beyond
+    # its own name — the only place `$/.github/workflows/<name>.yml` can point.
+    prefix = "$/.github/workflows/"
+    if not uses.startswith(prefix):
+        return None
+    return uses.removeprefix(prefix).removesuffix(".yml")
+
+
+def _cannot_judge(
+    job: Doc, wf_triggers: Doc, capability: str | None, called_job: str | None
+) -> str | None:
+    if capability is not None and called_job is not None:
+        for entry in cast(list[Doc], fixture().get(capability, {}).get("skips_under", [])):
+            if called_job in cast(list[Any], entry.get("jobs", [])):
+                return str(entry["reason"])
+    if "if" in job:
+        return str(job["if"])
+    if "pull_request" not in wf_triggers:
+        events = ", ".join(str(event) for event in wf_triggers) or "no events"
+        return f"the workflow declares no pull_request trigger, only {events}"
+    return None
+
+
+def composed_contexts() -> list[ComposedContext]:
+    # Reads only caller workflows — a capability's own jobs are not what a ruleset can require.
+    out: list[ComposedContext] = []
+    for wf_name, doc in workflow_docs().items():
+        if is_capability(doc):
+            continue
+        wf_triggers = triggers(doc)
+        for job_id, job in jobs(doc).items():
+            if not isinstance(job, dict):
+                continue
+            job = cast(Doc, job)
+            calling_half = str(job.get("name", job_id))
+            capability = _called_capability(str(job["uses"])) if "uses" in job else None
+            called_names = fixture().get(capability, {}).get("check_name") if capability else None
+            if called_names:
+                for called_job in cast(list[str], called_names):
+                    out.append(
+                        ComposedContext(
+                            context=f"{calling_half} / {called_job}",
+                            workflow=wf_name,
+                            job=job_id,
+                            calls=capability,
+                            cannot_judge=_cannot_judge(job, wf_triggers, capability, called_job),
+                        )
+                    )
+            else:
+                out.append(
+                    ComposedContext(
+                        context=calling_half,
+                        workflow=wf_name,
+                        job=job_id,
+                        calls=capability,
+                        cannot_judge=_cannot_judge(job, wf_triggers, capability, None),
+                    )
+                )
+    return out
 
 
 def declared_inputs(doc: Doc) -> set[str]:

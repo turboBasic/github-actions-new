@@ -39,7 +39,7 @@ The full set the tree currently composes:
 | `commits / commit-messages` | `commit-messages.yml` job `commits` | yes |
 | `advisory / prek-advisory` | `advisory.yml` job `advisory` | no — advertised as advisory |
 | `describe / pr-description` | `describe-pr.yml` job `describe` | no — writes rather than judges |
-| `release-on-merge / python-ci` | `release-on-merge.yml` job `verify` | no — never fires on a pull request |
+| `verify / python-ci` | `release-on-merge.yml` job `verify` | no — never fires on a pull request |
 | `release-on-merge / tag-and-publish` | `release-on-merge.yml` job `release` | no — never fires on a pull request |
 | `propose` | `release-proposal.yml` job `propose` | no — never fires on a pull request |
 

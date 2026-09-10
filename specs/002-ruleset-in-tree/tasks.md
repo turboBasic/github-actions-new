@@ -181,28 +181,28 @@ that does it, naming what would stop reporting.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] In `tests/capabilities.py`, add the composer from
+- [X] T018 [US2] In `tests/capabilities.py`, add the composer from
       [R6](./research.md#r6--the-gates-two-halves): for every workflow under `.github/workflows`, for every
       job, the calling half is the job's `name` falling back to its id; where `uses:` names a capability in
       this repository, one context per `check_name` that capability records in `published_surface.toml`,
       spelled `<calling half> / <called job>`. A job calling nothing composes its own name alone. Return a
       `NamedTuple` carrying the fields in
       [data-model.md](./data-model.md#composed-context) so a failure can name provenance.
-- [ ] T019 [US2] Pre-flight the composer against the tree by name: it must produce `ci / python-ci` from
+- [X] T019 [US2] Pre-flight the composer against the tree by name: it must produce `ci / python-ci` from
       `ci.yml`, both `commits / pr-title` and `commits / commit-messages` from `commit-messages.yml`, and
       `propose` from `release-proposal.yml`. This is the gate on the gate — a composer that stops reading
       `uses:` would otherwise report green over every retired name at once.
-- [ ] T020 [US2] In `tests/test_ruleset_contexts.py`, [FR-008](./spec.md#functional-requirements): every
+- [X] T020 [US2] In `tests/test_ruleset_contexts.py`, [FR-008](./spec.md#functional-requirements): every
       required context in every committed ruleset is composed by the tree. Both halves — a context naming a
       called job that `published_surface.toml` does not record fails too.
-- [ ] T021 [US2] [FR-010](./spec.md#functional-requirements): the failure names the context, where it is
+- [X] T021 [US2] [FR-010](./spec.md#functional-requirements): the failure names the context, where it is
       required, what composes it or fails to, and that the committed ruleset must be edited in the same
       change. Assert the message content, not only the failure — a gate whose message says nothing is an
       exit code, and the conventions layer says that is not a result.
-- [ ] T022 [US2] Assert the deliberate non-failure: a context the tree composes but the ruleset does not
+- [X] T022 [US2] Assert the deliberate non-failure: a context the tree composes but the ruleset does not
       require passes. Requiring more is a maintainer's decision and not this gate's
       ([spec.md Story 2, scenario 4](./spec.md#user-story-2---a-retired-context-fails-the-pull-request-priority-p2)).
-- [ ] T023 [US2] Prove it can fail. Rename `ci.yml`'s job `ci` to `gates`, run
+- [X] T023 [US2] Prove it can fail. Rename `ci.yml`'s job `ci` to `gates`, run
       `uv run pytest tests/test_ruleset_contexts.py`, read the message, restore the file. This is the exact
       change that went unnoticed for six commits in `001-consumer-contract`; if the suite passes, the gate
       is reading the wrong thing.
