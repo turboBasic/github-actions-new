@@ -54,9 +54,18 @@ the workflows plus `published_surface.toml` (R6).
 
 | Condition | Reason carried |
 | --- | --- |
-| the called capability records a `skips_under` entry covering the called job | that entry's own `reason`, quoted |
+| the called capability is marked `judges = false` in `published_surface.toml` | a fixed sentence naming the capability |
 | the calling job carries an `if:` | the condition, verbatim |
 | the calling workflow declares no `pull_request` trigger | the events it does declare |
+
+`judges = false` is a fact about the capability, not about the calling workflow: it means the job goes
+green without a pass/fail verdict on what it names, whether by design (advisory, so it reports success
+regardless of findings) or by nature (it writes rather than checks). `skips_under` records a different,
+narrower fact — that a job's own `if:` can skip it under some event — and does not by itself disqualify a
+context: `conventional-commits` records exactly such an entry for `pr-title` and `commit-messages`, and
+both are safe to require, because the one workflow that calls it never fires under the event the entry
+names. Conflating the two would fail `commits / pr-title` and `commits / commit-messages`, which FR-013
+forbids.
 
 A context with `cannot_judge` set may exist and may be advertised. It may not be required (FR-009).
 

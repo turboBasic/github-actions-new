@@ -97,6 +97,48 @@ def test_the_unresolved_message_names_the_ruleset_the_context_and_what_to_do() -
     assert ".github/rulesets/protect-default-branch.json" in message
 
 
+def test_cannot_judge_is_set_by_name_for_the_contexts_that_cannot_be_required() -> None:
+    # Pre-flight against the tree by name: each reason has a different cause, and a composer that
+    # stops reading any one of them would report green over exactly the context that reason exists
+    # to catch.
+    by_context = {c.context: c.cannot_judge for c in composed_contexts()}
+    assert by_context["advisory / prek-advisory"] is not None
+    assert by_context["describe / pr-description"] is not None
+    for context in ("verify / python-ci", "release / tag-and-publish", "propose"):
+        reason = by_context[context]
+        assert reason is not None
+        assert "pull_request" in reason
+    assert by_context["ci / python-ci"] is None
+
+
+def _cannot_be_required(ruleset_name: str, context: str, reason: str) -> str:
+    # FR-009, principle VII made structural: a required context that reports green without judging
+    # anything is a required gate nobody would ever see fail. The reason is quoted, not summarised,
+    # so the message is the record of why this one is exempt.
+    return (
+        f"{ruleset_name} requires {context!r}, which cannot judge anything: {reason}. "
+        f"Remove it from .github/rulesets/{ruleset_name}.json — a required gate never passes "
+        "without judging"
+    )
+
+
+def test_no_required_context_can_skip_under_the_event_it_would_gate() -> None:
+    cannot_judge = {c.context: c.cannot_judge for c in composed_contexts()}
+    for name, doc in ruleset_docs().items():
+        for context in required_contexts(doc):
+            reason = cannot_judge.get(context)
+            assert reason is None, _cannot_be_required(name, context, reason or "")
+
+
+def test_the_cannot_be_required_message_quotes_the_reason() -> None:
+    message = _cannot_be_required(
+        "protect-default-branch", "advisory / prek-advisory", "it is advisory"
+    )
+    assert "protect-default-branch" in message
+    assert "advisory / prek-advisory" in message
+    assert "it is advisory" in message
+
+
 def test_a_context_the_tree_composes_but_does_not_require_causes_no_failure() -> None:
     # Not every check is a gate. Requiring more is a maintainer's decision, not this gate's —
     # spec.md Story 2, scenario 4. `advisory / prek-advisory` is composed and, deliberately, is not

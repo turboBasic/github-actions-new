@@ -221,19 +221,22 @@ fail quoting that capability's own recorded skip reason.
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] In `tests/capabilities.py`, add `cannot_judge` to the composed context, set by whichever
+- [X] T024 [US3] In `tests/capabilities.py`, add `cannot_judge` to the composed context, set by whichever
       of the three conditions in [data-model.md](./data-model.md#composed-context) holds, carrying the
-      reason as text: the called capability's own `skips_under` reason from `published_surface.toml`, the
-      calling job's `if:` verbatim, or the events the calling workflow does declare.
-- [ ] T025 [US3] Pre-flight it against the tree by name: `advisory / prek-advisory` and
+      reason as text: a fixed sentence naming the capability when it is marked `judges = false` in
+      `published_surface.toml`, the calling job's `if:` verbatim, or the events the calling workflow does
+      declare. A capability's `skips_under` entry does not by itself disqualify a context — see
+      [data-model.md](./data-model.md#composed-context) for why `commits / pr-title` and
+      `commits / commit-messages` must stay unaffected by it.
+- [X] T025 [US3] Pre-flight it against the tree by name: `advisory / prek-advisory` and
       `describe / pr-description` must come back with a reason, both `release-on-merge` contexts and
       `propose` must come back with the no-`pull_request` reason, and `ci / python-ci` must come back with
       none.
-- [ ] T026 [US3] [FR-009](./spec.md#functional-requirements): no required context may carry
+- [X] T026 [US3] [FR-009](./spec.md#functional-requirements): no required context may carry
       `cannot_judge`. One test, three reasons, and the failure quotes whichever reason applied — principle
       VII made structural rather than written down.
-- [ ] T027 [US3] Prove it can fail, three ways: add `advisory / prek-advisory` to the committed required
-      list (a recorded skip), then `release-on-merge / tag-and-publish` (no `pull_request` trigger), then
+- [X] T027 [US3] Prove it can fail, three ways: add `advisory / prek-advisory` to the committed required
+      list (`judges = false`), then `release / tag-and-publish` (no `pull_request` trigger), then
       `apply-ruleset / apply` (same). Each must fail with its own reason. Restore the file after each.
 
 **Checkpoint**: both halves of the gate hold. Every requirement in the spec is asserted by something that

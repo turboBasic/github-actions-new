@@ -18,7 +18,7 @@ from capabilities import (
 REQUIRED = frozenset(
     {"kind", "published", "inputs", "permissions", "tool_prerequisites", "skips_under"}
 )
-OPTIONAL = frozenset({"check_name"})
+OPTIONAL = frozenset({"check_name", "judges"})
 
 
 def tree_surface() -> dict[str, Doc]:

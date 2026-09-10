@@ -40,7 +40,7 @@ The full set the tree currently composes:
 | `advisory / prek-advisory` | `advisory.yml` job `advisory` | no — advertised as advisory |
 | `describe / pr-description` | `describe-pr.yml` job `describe` | no — writes rather than judges |
 | `verify / python-ci` | `release-on-merge.yml` job `verify` | no — never fires on a pull request |
-| `release-on-merge / tag-and-publish` | `release-on-merge.yml` job `release` | no — never fires on a pull request |
+| `release / tag-and-publish` | `release-on-merge.yml` job `release` | no — never fires on a pull request |
 | `propose` | `release-proposal.yml` job `propose` | no — never fires on a pull request |
 
 The gap this feature closes: renaming a calling job, retiring a workflow, or making a job conditional
@@ -140,8 +140,9 @@ offline. It fails. Delivers the half of the check that a resolvable name does no
 
 **Acceptance Scenarios**:
 
-1. **Given** a required context whose called capability declares a `skips_under` entry for its job,
-   **When** the suite runs, **Then** it fails, quoting the recorded reason for the skip.
+1. **Given** a required context whose called capability is marked `judges = false` — it goes green
+   without a pass/fail verdict on what it names — **When** the suite runs, **Then** it fails, naming the
+   capability.
 2. **Given** a required context composed by a workflow that has no `pull_request` trigger, **When** the
    suite runs, **Then** it fails — it cannot report on the event the ruleset gates.
 3. **Given** a required context composed by a job carrying an `if:`, **When** the suite runs, **Then**
@@ -188,9 +189,12 @@ offline. It fails. Delivers the half of the check that a resolvable name does no
 - **FR-008**: The test suite MUST assert that every required context in every committed ruleset is
   composed by this repository's own workflows, resolving both halves — the calling job's name and the
   called capability's job name as `published_surface.toml` records it.
-- **FR-009**: The test suite MUST assert that no required context is composed by a job that can skip:
-  one whose capability records a `skips_under` entry covering it, one carrying an `if:`, or one in a
-  workflow with no `pull_request` trigger.
+- **FR-009**: The test suite MUST assert that no required context is composed by a job that cannot
+  produce a pass/fail verdict on what it names: one whose capability is marked `judges = false` in
+  `published_surface.toml`, one carrying an `if:`, or one in a workflow with no `pull_request` trigger.
+  A capability's `skips_under` entry records a narrower fact — that its job's own `if:` can skip it
+  under some event — and does not by itself disqualify a context: whether that entry's event is ever
+  reached depends on which workflow calls it.
 - **FR-010**: A failure from FR-008 or FR-009 MUST name the context, where it is required, what
   composes it or fails to, and what a maintainer should change.
 - **FR-011**: The test suite MUST reach both verdicts without network access.

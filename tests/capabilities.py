@@ -110,13 +110,9 @@ def _called_capability(uses: str) -> str | None:
     return uses.removeprefix(prefix).removesuffix(".yml")
 
 
-def _cannot_judge(
-    job: Doc, wf_triggers: Doc, capability: str | None, called_job: str | None
-) -> str | None:
-    if capability is not None and called_job is not None:
-        for entry in cast(list[Doc], fixture().get(capability, {}).get("skips_under", [])):
-            if called_job in cast(list[Any], entry.get("jobs", [])):
-                return str(entry["reason"])
+def _cannot_judge(job: Doc, wf_triggers: Doc, capability: str | None) -> str | None:
+    if capability is not None and fixture().get(capability, {}).get("judges", True) is False:
+        return f"{capability} never judges what it names; the run may report success without checking anything"
     if "if" in job:
         return str(job["if"])
     if "pull_request" not in wf_triggers:
@@ -139,6 +135,7 @@ def composed_contexts() -> list[ComposedContext]:
             calling_half = str(job.get("name", job_id))
             capability = _called_capability(str(job["uses"])) if "uses" in job else None
             called_names = fixture().get(capability, {}).get("check_name") if capability else None
+            cannot_judge = _cannot_judge(job, wf_triggers, capability)
             if called_names:
                 for called_job in cast(list[str], called_names):
                     out.append(
@@ -147,7 +144,7 @@ def composed_contexts() -> list[ComposedContext]:
                             workflow=wf_name,
                             job=job_id,
                             calls=capability,
-                            cannot_judge=_cannot_judge(job, wf_triggers, capability, called_job),
+                            cannot_judge=cannot_judge,
                         )
                     )
             else:
@@ -157,7 +154,7 @@ def composed_contexts() -> list[ComposedContext]:
                         workflow=wf_name,
                         job=job_id,
                         calls=capability,
-                        cannot_judge=_cannot_judge(job, wf_triggers, capability, None),
+                        cannot_judge=cannot_judge,
                     )
                 )
     return out
