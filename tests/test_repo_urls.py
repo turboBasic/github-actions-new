@@ -17,6 +17,16 @@ EXEMPT: dict[str, str] = {
     "README.md": "states the staging arrangement, so it names the destination and the staging repo",
 }
 
+# Another repository of this owner's, named on purpose. The matcher cannot tell a stale self URL from a
+# deliberate reference to a different repository, so each deliberate one is named here with why —
+# exempting the file instead would stop checking that file's own self URLs, which is what the gate is for.
+OTHER_REPOSITORIES: dict[str, str] = {
+    "turboBasic/github-actions-test": (
+        "the verification harness; a capability's caller-side behaviour is exercised from there, and it "
+        "is deliberately not this repository"
+    ),
+}
+
 
 # A `uses:` slug is a resolvable reference just like a URL, and GitHub redirects a renamed
 # repository's refs too — so a stale one keeps working and nothing announces the drift. The README is
@@ -58,12 +68,20 @@ def test_every_self_url_names_the_repository_this_clone_actually_is() -> None:
         if path.startswith((".specify/", ".claude/skills/speckit-")):
             continue
         text = (REPO / path).read_text(encoding="utf-8", errors="ignore")
-        stale += [f"{path}: {m}" for m in URL_OWNER_REPO.findall(text) if m != slug]
-    assert stale == [], f"URL names a repository other than {slug}: {stale}"
+        stale += [
+            f"{path}: {m}"
+            for m in URL_OWNER_REPO.findall(text)
+            if m != slug and m not in OTHER_REPOSITORIES
+        ]
+    assert stale == [], (
+        f"URL names a repository other than {slug}: {stale}. Repoint it, or name the repository in "
+        "OTHER_REPOSITORIES with why it is deliberately not this one"
+    )
 
 
 def test_every_exemption_carries_a_reason() -> None:
     assert all(reason.strip() for reason in EXEMPT.values())
+    assert all(reason.strip() for reason in OTHER_REPOSITORIES.values())
 
 
 def test_every_self_reference_by_slug_names_the_repository_this_clone_is() -> None:

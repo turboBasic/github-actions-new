@@ -359,7 +359,5 @@ its own code, and there is nothing for you to bootstrap.
 
 `AGENTS.md` is the map — it names every artefact and what that artefact answers. Start there.
 
-```console
-mise run setup   # tools, dependencies, git hooks
-mise run ci      # everything CI runs
-```
+`CONTRIBUTING.md` has the setup, the loop, how a change to a capability is verified, and how a release is
+cut. Anything exploitable goes to `SECURITY.md`'s private report rather than an issue.

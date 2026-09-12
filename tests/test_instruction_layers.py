@@ -11,6 +11,9 @@ LAYERS: dict[int, frozenset[str]] = {
     3: frozenset(
         {
             "README.md",
+            "CONTRIBUTING.md",
+            "SECURITY.md",
+            "CODE_OF_CONDUCT.md",
             "docs/instruction-layers.md",
             "docs/technical-debt.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
