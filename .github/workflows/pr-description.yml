@@ -7,10 +7,6 @@ on:
         description: The template whose two substitution points are filled in.
         type: string
         default: .github/PULL_REQUEST_TEMPLATE.md
-      timeout-minutes:
-        description: How long the job may run before it is cancelled.
-        type: number
-        default: 5
 
 # A caller identifies nothing — not the pull request, not the repository, not the commit range, not a
 # token. All of it is already in the run, and every one of those as an input is a value a call site can
@@ -24,7 +20,7 @@ jobs:
     # Registered in the surface fixture's skip table: on any other event there is no body to write.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    timeout-minutes: 5
     permissions:
       contents: read # the full-history checkout this capability owns
       pull-requests: write # writing the body it rendered

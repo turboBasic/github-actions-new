@@ -35,10 +35,6 @@ on:
           revert
           style
           test
-      timeout-minutes:
-        description: How long either job may run before it is cancelled.
-        type: number
-        default: 5
 
 permissions:
   contents: read # the range check reads it from git, so it checks the tree out
@@ -66,7 +62,7 @@ jobs:
     # it would run with this repository's token against a fork's text.
     if: inputs.check-title && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    timeout-minutes: 5
     permissions:
       contents: read # nothing is checked out here, but the grant is what the workflow-level block asks of the caller
       pull-requests: read # the title is read from the API rather than the payload
@@ -106,7 +102,7 @@ jobs:
     name: commit-messages
     if: inputs.check-commits && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout-minutes }}
+    timeout-minutes: 5
     permissions:
       contents: read # the full-history checkout below, so the range can be read from git
     steps:

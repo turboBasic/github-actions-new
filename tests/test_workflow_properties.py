@@ -124,6 +124,50 @@ def test_the_cache_input_matcher_reads_a_name_it_is_given() -> None:
     assert not GOVERNS_A_CACHE.search("hook-stage")
 
 
+# An input is worth its place only where the caller knows something the callee cannot. A timeout is that
+# where the runtime is a function of the caller's tree, and nowhere else — every other knob on a
+# published surface is a promise with nothing behind it.
+TIMEOUT_INPUT = "timeout-minutes"
+
+MAY_TAKE_A_TIMEOUT = {
+    "python-ci": "runs the caller's own tasks and cannot know how long they take",
+    "prek-advisory": "reads the caller's whole tree and cannot know how large it is",
+}
+
+
+def test_a_timeout_input_exists_only_where_the_caller_knows_the_runtime() -> None:
+    # Set equality, not a subset: a capability joining the set fails, and one leaving it fails too, so
+    # the justification above and the tree cannot part company in either direction.
+    declaring = {
+        name
+        for name, doc in workflow_docs().items()
+        if is_capability(doc) and TIMEOUT_INPUT in declared_inputs(doc)
+    }
+    assert declaring == set(MAY_TAKE_A_TIMEOUT), (
+        f"capabilities declaring {TIMEOUT_INPUT} are {sorted(declaring)}; the ones a caller can time "
+        f"better than the callee are {sorted(MAY_TAKE_A_TIMEOUT)}. "
+        + "; ".join(f"{name} {why}" for name, why in sorted(MAY_TAKE_A_TIMEOUT.items()))
+        + ". A capability whose runtime is its own fixes its timeout in its jobs; adding or removing this "
+        "input changes the published surface, so the fixture moves in the same change"
+    )
+
+
+def test_every_job_of_a_capability_without_the_input_fixes_its_own_timeout() -> None:
+    # An input removed leaves nothing behind: the schema hook refuses a job with no timeout at all, and
+    # this says the same thing where the removal happened, so the two are not one hook away from silence.
+    unbounded: list[str] = []
+    for name, doc in workflow_docs().items():
+        if not is_capability(doc) or name in MAY_TAKE_A_TIMEOUT:
+            continue
+        for job_id, job in jobs(doc).items():
+            if TIMEOUT_INPUT not in job:
+                unbounded.append(f"{name}: job {job_id}")
+    assert unbounded == [], (
+        f"jobs with no {TIMEOUT_INPUT} of their own: {unbounded}. Their capability takes no timeout "
+        "input, so nothing else would bound them"
+    )
+
+
 def test_the_lockfile_check_precedes_every_stage_of_python_ci() -> None:
     ids = [str(step.get("id", "")) for step in steps_of("python-ci", "python-ci")]
     missing = [step_id for step_id in ("lockfile", *STAGES) if step_id not in ids]
