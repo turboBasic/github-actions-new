@@ -35,6 +35,8 @@ zizmorcore
 # GitHub advisory ids and the OpenSSF Scorecard, both named by dependency-review-action's inputs;
 # NOASSERTION is SPDX's own token for a licence a package declares nothing about
 ghsas
+# difflib.unified_diff's parameter for what terminates a rendered line
+lineterm
 NOASSERTION
 OpenSSF
 pyupgrade

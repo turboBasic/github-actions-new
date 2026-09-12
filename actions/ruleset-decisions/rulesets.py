@@ -1,3 +1,4 @@
+import difflib
 import json
 import os
 import sys
@@ -98,12 +99,17 @@ def normalize(doc: Doc) -> Doc:
 
 
 def render_difference(committed: Doc, live: Doc) -> str:
-    lines = [
-        f"{field}: committed={committed.get(field)!r} live={live.get(field)!r}"
-        for field in sorted(WRITABLE_FIELDS)
-        if committed.get(field) != live.get(field)
-    ]
-    return "\n".join(lines)
+    # A line per differing field put the whole value on that line, so changing one required context
+    # printed both `rules` arrays end to end. This is the last thing read before a write that has no
+    # revert, so it is a diff of the two documents rather than a summary of which fields moved.
+    def rendered(doc: Doc) -> list[str]:
+        projected = {field: doc.get(field) for field in sorted(WRITABLE_FIELDS)}
+        return json.dumps(projected, indent=2, sort_keys=True).splitlines()
+
+    # Live first, so `-` is what GitHub holds now and `+` is what the write would leave.
+    return "\n".join(
+        difflib.unified_diff(rendered(live), rendered(committed), "live", "committed", lineterm="")
+    )
 
 
 def decide(committed: Doc, live: list[Doc]) -> Verdict:
