@@ -134,20 +134,23 @@ pairing reddens while its gate stays green. That divergence is the whole point.
 **⚠️ File contention**: T012–T015 all edit `tests/test_workflow_properties.py`, so they are sequential
 with each other and with US5's T031. T016 and T017 are free.
 
-- [ ] T012 [US6] Pair the `PERMISSION` line regex in `tests/test_workflow_properties.py`: assert a
+- [X] T012 [US6] Pair the `PERMISSION` line regex in `tests/test_workflow_properties.py`: assert a
   permission line with a reason is not flagged and one without a reason is
-- [ ] T013 [US6] Pair the `WRITES_A_VERSION` marker tuple in `tests/test_workflow_properties.py`: assert
+- [X] T013 [US6] Pair the `WRITES_A_VERSION` marker tuple in `tests/test_workflow_properties.py`: assert
   a planted `run:` authoring a commit is matched by at least one marker
-- [ ] T014 [US6] Pair the `GOVERNS_A_CACHE` regex in `tests/test_workflow_properties.py`: `cache-key`
+- [X] T014 [US6] Pair the `GOVERNS_A_CACHE` regex in `tests/test_workflow_properties.py`: `cache-key`
   matched, `hook-stage` not
-- [ ] T015 [US6] Close the vacuous pass in `test_both_grammar_jobs_pin_the_event_they_can_judge` in
+- [X] T015 [US6] Close the vacuous pass in `test_both_grammar_jobs_pin_the_event_they_can_judge` in
   `tests/test_workflow_properties.py`: assert the workflow yields a non-empty job map before the loop, so
   an empty map fails rather than iterating over nothing
-- [ ] T016 [P] [US6] Pair `blanket_permissions()` in `tests/test_published_surface.py`: assert a document
+- [X] T016 [P] [US6] Pair `blanket_permissions()` in `tests/test_published_surface.py`: assert a document
   with `permissions: read-all` is returned by it
-- [ ] T017 [P] [US6] Pair the `URL_OWNER_REPO` regex in `tests/test_repo_urls.py`: a self URL matched, a
+- [X] T017 [P] [US6] Pair the `URL_OWNER_REPO` regex in `tests/test_repo_urls.py`: a self URL matched, a
   foreign host not. Mirror `USES_SLUG`'s existing pairing, and keep this module's self-exclusion in mind —
   the counter-examples must not read as drift
+
+**Landed as two commits rather than six**: the four pairings in one file, then the two in the others.
+Each is four lines guarding one reader; splitting them further would have been ceremony, not atomicity.
 
 **Checkpoint**: no gate in the suite can rot into reporting green unnoticed.
 
@@ -161,18 +164,18 @@ message the local hook accepts cannot fail in CI.
 **Independent Test**: change `CZ_VERSION` away from the locked version and confirm the gate names both
 locations; add a type to one declaration only and confirm the same.
 
-- [ ] T018 [US2] Create `tests/test_commit_grammar.py` with FR-007: read the shipped type set from
+- [X] T018 [US2] Create `tests/test_commit_grammar.py` with FR-007: read the shipped type set from
   `ConventionalCommitsCz(BaseConfig()).schema_pattern()`, extract its first alternation group, and assert
   it equals the `types` default declared in `.github/workflows/conventional-commits.yml` read through
   `tests/capabilities.py`. Never `ConventionalCommitsCz.schema_pattern(ConventionalCommitsCz)`, and never
   a literal list — that is the third copy the requirement removes (research R5)
-- [ ] T019 [US2] Add its pairing: assert the extracted set is non-empty and contains a known member, so
+- [X] T019 [US2] Add its pairing: assert the extracted set is non-empty and contains a known member, so
   an accessor returning nothing fails rather than comparing two empty sets
-- [ ] T020 [US2] Add FR-008 to `tests/test_commit_grammar.py`: assert `CZ_VERSION` in
+- [X] T020 [US2] Add FR-008 to `tests/test_commit_grammar.py`: assert `CZ_VERSION` in
   `.github/workflows/conventional-commits.yml` equals the commitizen version `uv.lock` resolves, read
   with `tomllib`. Compare against the lockfile, not the installed environment — an installed version is a
   property of the machine (research R6). The message names both values and both file paths
-- [ ] T021 [US2] Add its pairing: assert both readers return a non-empty version string, so a lockfile
+- [X] T021 [US2] Add its pairing: assert both readers return a non-empty version string, so a lockfile
   format change that stops the reader finding commitizen fails here rather than comparing two absences
 
 **Checkpoint**: an unattended dependency bump that moves one spelling and not the other now fails CI.
@@ -187,23 +190,23 @@ independent of the others.
 **Independent Test**: set a tool entry to `latest`; bump the specification pin without re-syncing; alter
 one byte of a vendored file. Each names the artefact and the edit.
 
-- [ ] T022 [P] [US3] Create `tests/test_tool_versions.py` with FR-009: every `mise.toml` `[tools]` entry
+- [X] T022 [P] [US3] Create `tests/test_tool_versions.py` with FR-009: every `mise.toml` `[tools]` entry
   names a concrete version, refusing `latest`, an empty value and a non-string. Assert the table is
   non-empty first, so an empty read fails
-- [ ] T023 [P] [US3] Add its pairing: assert the check flags a planted `latest` entry and passes a
+- [X] T023 [P] [US3] Add its pairing: assert the check flags a planted `latest` entry and passes a
   planted concrete one
-- [ ] T024 [P] [US3] Create `tests/test_speckit_vendoring.py` with FR-010, ported from the tree being
+- [X] T024 [P] [US3] Create `tests/test_speckit_vendoring.py` with FR-010, ported from the tree being
   consolidated (research R9): each `.specify/integrations/*.manifest.json` records the version
   `mise.toml` pins for `pipx:specify-cli`, and every file it records exists and matches its recorded
   SHA-256. The message names the re-sync task and must not suggest upgrading outside the pin
-- [ ] T025 [P] [US3] Add its pairing: assert each manifest's file map is non-empty, so a manifest
+- [X] T025 [P] [US3] Add its pairing: assert each manifest's file map is non-empty, so a manifest
   recording nothing fails instead of vacuously matching
-- [ ] T026 [P] [US3] Create `tests/test_actionlint_ignore.py` with FR-011: plant both `$/` forms in
+- [X] T026 [P] [US3] Create `tests/test_actionlint_ignore.py` with FR-011: plant both `$/` forms in
   `tmp_path` — a job-level reusable-workflow `uses:` and a step-level action `uses:` — run `actionlint`
   there with no configuration, and assert each still produces a message matching the corresponding
   ignore pattern committed in `.github/actionlint.yaml`. Guard on `shutil.which("actionlint")`. The
   message says to delete the `paths:` entry, the file, and TD-001 together (research R7)
-- [ ] T027 [P] [US3] Add its pairing: assert the probe produces a verdict at all and that the committed
+- [X] T027 [P] [US3] Add its pairing: assert the probe produces a verdict at all and that the committed
   ignore patterns are the ones being matched against, read from `.github/actionlint.yaml` rather than
   restated — otherwise the gate holds the test's copy of the pattern and not the file's
 
@@ -222,16 +225,16 @@ which entries can ever have a run history.
 
 **Depends on**: T002, T003.
 
-- [ ] T028 [US4] Create `tests/test_names.py` with FR-012: every job name in every workflow is
+- [X] T028 [US4] Create `tests/test_names.py` with FR-012: every job name in every workflow is
   lowercase-kebab-case, read through `check_names()` so the gate and the consumer contract cannot
   disagree about what a name is. Expected green — the rule already holds (research R11). Include the
   pairing: `Python_CI` and `pr title` are refused, `pr-title` accepted
-- [ ] T029 [US4] Add FR-013 to `tests/test_names.py`: every workflow's `name:` is its marker plus its
+- [X] T029 [US4] Add FR-013 to `tests/test_names.py`: every workflow's `name:` is its marker plus its
   filename stem, with the marker chosen by T003's accessor — `🧩` where `workflow_call` is the only
   trigger, `🌜` where the workflow has triggers of its own (research R10). Derive the expected name from
   the file so a workflow the reader misses has no name to compare, and assert the workflow count is
   non-empty. Fails now on all twelve
-- [ ] T030 [US4] Rename all twelve `.github/workflows/*.yml` `name:` values to carry their marker. T029
+- [X] T030 [US4] Rename all twelve `.github/workflows/*.yml` `name:` values to carry their marker. T029
   goes green. Verify in the same commit that `mise run test` shows no change in
   `tests/test_ruleset_contexts.py` — every required context is composed from job names, so this breaks no
   consumer (research R10), and that gate is what says so rather than a reviewer
