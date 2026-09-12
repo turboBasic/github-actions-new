@@ -1,5 +1,8 @@
 import re
+import shutil
+import subprocess
 import tomllib
+from pathlib import Path
 from typing import Any, cast
 
 from capabilities import REPO, allowed_commit_types
@@ -151,3 +154,110 @@ def test_the_destination_reader_places_a_type_it_is_given_and_reports_one_it_can
     assert destination("feat: a subject") not in (None, SKIP)
     assert destination("chore: a subject") == SKIP
     assert destination("nonsense: a subject") is None
+
+
+# One commit of every type, plus the four subjects whose rendering is the whole point: a subject that
+# already carries a number, one that carries none, a ref pin, and an address.
+SUBJECTS = (
+    "feat: a numbered subject (#12)",
+    "fix: subject with no number",
+    "fix: repin every call site to @v5 (#20)",
+    "fix: stop mailing t@t.example on release (#21)",
+    "perf: faster (#4)",
+    "refactor: moved (#5)",
+    "revert: undone (#6)",
+    "docs: documented (#7)",
+    "chore: not published (#8)",
+)
+
+NO_NUMBER = "subject with no number"
+
+
+def _git(repo: Path, *args: str) -> str:
+    # A list, never a shell string: a subject here is text this test chose, and the habit of handing it
+    # to a shell is the one that matters where the text comes from outside.
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+def plant(repo: Path) -> None:
+    _git(repo, "init", "-q", "-b", "main", ".")
+    for index, subject in enumerate(SUBJECTS):
+        (repo / "f").write_text(str(index), encoding="utf-8")
+        _git(repo, "add", "f")
+        _git(repo, "commit", "-qm", subject)
+
+
+def short_id(repo: Path, grep: str) -> str:
+    return _git(repo, "log", "--format=%H", "-1", f"--grep={grep}").strip()[:7]
+
+
+def render(repo: Path) -> str:
+    # Rendered rather than read. A pattern that has rotted into matching nothing, or into matching
+    # everything, leaves valid TOML and a body that reads correctly to everyone except the person
+    # GitHub notifies — so there is no shape to assert, only output.
+    assert shutil.which("git-cliff"), (
+        "git-cliff is not on PATH, so the release notes cannot be rendered and the two gates below are "
+        "not running. Run the suite as `mise run test`, which puts the pinned tools on PATH"
+    )
+    return subprocess.run(
+        # `--config` explicitly: git-cliff finds a configuration by name, and the planted repository
+        # must not be able to supply one of its own. `cwd`, never `mise exec --cd`, which would render
+        # this repository and pass whatever was planted.
+        ["git-cliff", "--config", str(CLIFF), "--unreleased"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+def test_the_rendered_sections_are_the_committed_titles_in_order(tmp_path: Path) -> None:
+    plant(tmp_path)
+    rendered = render(tmp_path)
+    headings = [
+        line.removeprefix("### ") for line in rendered.splitlines() if line.startswith("### ")
+    ]
+    assert headings == [title for _, title in SECTIONS], (
+        f"a release body rendered its sections as {headings}, and a release publishes "
+        f"{[title for _, title in SECTIONS]}. Either a section moved, or an ordering prefix is no "
+        f"longer being stripped and is now visible to every reader. Rendered:\n{rendered}"
+    )
+    assert "Not published" not in rendered, (
+        f"a skipped type reached the notes, so a commit a consumer cannot observe is being published as "
+        f"a change. Rendered:\n{rendered}"
+    )
+
+
+def test_an_item_without_a_pull_request_number_carries_its_commit_id(tmp_path: Path) -> None:
+    plant(tmp_path)
+    rendered = render(tmp_path)
+    short = short_id(tmp_path, NO_NUMBER)
+    assert f"- Subject with no number ({short})" in rendered, (
+        f"an item whose subject carries no `(#N)` rendered without its commit id, so it references "
+        f"nothing and no reader can find the change it describes. Expected `({short})`. "
+        f"Rendered:\n{rendered}"
+    )
+    assert "- A numbered subject (#12)\n" in rendered, (
+        f"an item that already carries `(#12)` was given a second reference as well, so every such line "
+        f"now ends in two. Rendered:\n{rendered}"
+    )
+
+
+def test_a_ref_pin_in_a_subject_mentions_nobody(tmp_path: Path) -> None:
+    plant(tmp_path)
+    rendered = render(tmp_path)
+    assert "- Repin every call site to `@v5` (#20)" in rendered, (
+        f"a ref pin rendered as a bare `@v5`, which GitHub resolves to whoever holds that login: it "
+        f"credits them as a contributor on the release and notifies them, and a published release "
+        f"cannot be withdrawn. Rendered:\n{rendered}"
+    )
+    assert "t@t.example" in rendered and "`@t.example`" not in rendered, (
+        f"the mention pattern is not anchored on a preceding space or bracket, so it broke an address "
+        f"mid-word instead of neutralizing a mention. Rendered:\n{rendered}"
+    )

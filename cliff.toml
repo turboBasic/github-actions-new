@@ -4,17 +4,25 @@
 
 [changelog]
 header = ""
-body = """
+# A literal string, so the reference test's `\(` reaches Tera rather than being read as a TOML escape.
+# Every item ends in a reference a reader can follow: the `(#N)` GitHub appends to a squash subject, or
+# the commit's short id where the subject has none — which is not hypothetical, since a rebase merge
+# and a hand-edited squash subject both arrive without one.
+body = '''
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 {% for commit in commits %}
-- {{ commit.message | upper_first }}{% if commit.breaking %} — **breaking**{% endif %}
+- {{ commit.message | upper_first }}{% if commit.message is not matching("\(#[0-9]+\)") %} ({{ commit.id | truncate(length=7, end="") }}){% endif %}{% if commit.breaking %} — **breaking**{% endif %}
 {%- endfor %}
-{% endfor %}"""
+{% endfor %}'''
 footer = ""
 trim = true
 postprocessors = [
   { pattern = '<!--[0-9]+-->', replace = "" },
+  # A bare `@v5` in a release body is an @-mention: GitHub resolves it to whoever holds that login,
+  # credits them under Contributors and notifies them. Backticks make it inert and still read as a ref
+  # pin. Anchored on a preceding space or bracket, so an address is left alone.
+  { pattern = '(?m)(^|[\s(\[])@([A-Za-z0-9][A-Za-z0-9-]*)', replace = '${1}`@${2}`' },
 ]
 
 [git]
