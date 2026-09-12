@@ -2,6 +2,7 @@ import ast
 from pathlib import Path
 
 import decisions
+import pytest
 from decisions import (
     ALREADY_RELEASED,
     BAD_SURFACE,
@@ -379,3 +380,23 @@ def test_the_baseline_is_the_lowest_version_there_is() -> None:
     # Nothing can sit below it, so no version is unreachable by a bump.
     assert UNRELEASED == (0, 0, 0)
     assert parse_version("0.0.0") == UNRELEASED
+
+
+def test_a_value_holding_the_delimiter_cannot_close_the_block_early(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The notes are rendered from commit messages, so a commit quoting a fixed delimiter would end the
+    # block and let the rest be read as further outputs. The delimiter is random per value instead.
+    output = tmp_path / "github_output"
+    output.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+    hostile = "delimiter0\nproceed=true\nref=__RELEASE_DECISIONS__"
+    decisions.emit(message=hostile, proceed="false")
+
+    written = output.read_text(encoding="utf-8")
+    assert hostile in written
+    opening = written.split("\n", 1)[0]
+    assert opening.startswith("message<<")
+    delimiter = opening.removeprefix("message<<")
+    assert delimiter not in hostile

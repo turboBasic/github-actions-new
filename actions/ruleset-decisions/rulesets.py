@@ -2,6 +2,7 @@ import difflib
 import json
 import os
 import sys
+import uuid
 from typing import Any, NamedTuple, cast
 
 Doc = dict[str, Any]
@@ -203,8 +204,12 @@ def emit(values: dict[str, str]) -> None:
         return
     with open(path, "a", encoding="utf-8") as handle:
         for name, value in values.items():
-            # A value may hold newlines — the difference does — so every output uses the delimiter form.
-            handle.write(f"{name}<<__RULESET_DECISIONS__\n{value}\n__RULESET_DECISIONS__\n")
+            # A value may hold newlines — the difference does — so every output uses the delimiter form,
+            # and the delimiter is random per value. A fixed one appearing inside the value would close
+            # the block early and let the remainder be read as further outputs; every value here is
+            # derived from an API response, so a ruleset named after the delimiter is all it would take.
+            delimiter = f"delimiter{uuid.uuid4().hex}"
+            handle.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
 def annotate(severity: str, message: str) -> None:

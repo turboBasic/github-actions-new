@@ -35,13 +35,20 @@ def test_required_contexts_returns_nothing_for_a_ruleset_with_no_such_rule() -> 
 
 
 def test_composed_contexts_finds_the_contexts_the_tree_actually_reports() -> None:
-    # Confirmed against this repository's own reported check-run names, not guessed.
+    # A pre-flight on the reader, deliberately not a census of this tree. The gate below reads which
+    # names matter from the committed ruleset, so listing them here as well would mean editing this
+    # test on every legitimate rename — and a test edited by every rename stops catching anything.
     contexts = {c.context for c in composed_contexts()}
-    assert "ci / python-ci" in contexts
-    assert "commits / pr-title" in contexts
-    assert "commits / commit-messages" in contexts
-    assert "propose" in contexts
-    assert "guard / dependency-review" in contexts
+    assert contexts, (
+        "composed_contexts() found no context at all. Every gate comparing a required context against "
+        "the tree passes vacuously while that is true, so this is a defect in the reader rather than "
+        "in any ruleset. Check that the caller workflows still declare `uses:` and job ids"
+    )
+    malformed = sorted(c for c in contexts if not c.strip() or c != c.strip())
+    assert not malformed, (
+        f"composed_contexts() returned {malformed}, which no check run can be named. A ruleset "
+        "requiring one of these would name a gate that never reports"
+    )
 
 
 def _unresolved(ruleset_name: str, context: str) -> str:
@@ -72,14 +79,31 @@ def test_the_unresolved_message_names_the_ruleset_the_context_and_what_to_do() -
 
 def test_cannot_judge_is_set_by_name_for_the_contexts_that_cannot_be_required() -> None:
     # One context per reason, so dropping any single reason fails here rather than only where it counts.
+    # Naming them is the point of this test, so a rename edits it — but it says so rather than raising
+    # a bare KeyError at whoever is halfway through renaming a job.
     by_context = {c.context: c.cannot_judge for c in composed_contexts()}
-    assert by_context["advisory / prek-advisory"] is not None
-    assert by_context["describe / pr-description"] is not None
+
+    def reason_for(context: str) -> str | None:
+        assert context in by_context, (
+            f"nothing in the tree composes {context!r}, so this pre-flight cannot check what is said "
+            "about its ability to judge. A calling job was renamed or retired: correct the name here, "
+            "and check whether .github/rulesets/ still requires the old one. Composed today: "
+            f"{sorted(by_context)}"
+        )
+        return by_context[context]
+
+    assert reason_for("advisory / prek-advisory") is not None
+    assert reason_for("describe / pr-description") is not None
     for context in ("verify / python-ci", "release / tag-and-publish", "propose"):
-        reason = by_context[context]
-        assert reason is not None
-        assert "pull_request" in reason
-    assert by_context["ci / python-ci"] is None
+        reason = reason_for(context)
+        assert reason is not None, f"{context!r} composes a context that judges, unexpectedly"
+        assert "pull_request" in reason, (
+            f"{context!r} cannot judge, but not for the event: {reason}"
+        )
+    assert reason_for("ci / python-ci") is None, (
+        "'ci / python-ci' is the one context this repository's own ruleset requires, so it has to be "
+        "able to judge. A reason appearing here means the required gate now reports green regardless"
+    )
 
 
 def _cannot_be_required(ruleset_name: str, context: str, reason: str) -> str:

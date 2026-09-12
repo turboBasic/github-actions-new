@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import tomllib
+import uuid
 from collections.abc import Iterable
 from fnmatch import fnmatch
 from typing import Any, NamedTuple, cast
@@ -321,8 +322,12 @@ def emit(**values: str) -> None:
         return
     with open(path, "a", encoding="utf-8") as handle:
         for name, value in values.items():
-            # A value may hold newlines — rendered notes do — so every output uses the delimiter form.
-            handle.write(f"{name}<<__RELEASE_DECISIONS__\n{value}\n__RELEASE_DECISIONS__\n")
+            # A value may hold newlines — rendered notes do — so every output uses the delimiter form,
+            # and the delimiter is random per value. A fixed one appearing inside the value would close
+            # the block early and let the remainder be read as further outputs; the notes are rendered
+            # from commit messages, so a commit quoting the delimiter is all it would take.
+            delimiter = f"delimiter{uuid.uuid4().hex}"
+            handle.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
 def annotate(severity: str, message: str) -> None:
