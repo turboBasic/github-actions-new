@@ -96,20 +96,19 @@ jobs:
             | jq -sc '.' > "$RUNNER_TEMP/live.json"
 
       - id: decide
-        continue-on-error: true
         uses: $/actions/ruleset-decisions
         with:
           committed: .github/rulesets/${{ matrix.ruleset }}.json
           live: ${{ runner.temp }}/live.json
 
+      # `always()`, and the step above carries no `continue-on-error`: a refusal fails the job where it
+      # happens rather than being masked and re-raised later, and the difference still prints because the
+      # decision writes its outputs before it exits non-zero.
       - name: Print the difference
+        if: always()
         env:
           DIFFERENCE: ${{ steps.decide.outputs.difference }}
         run: printf '%s\n' "$DIFFERENCE"
-
-      - name: Refuse
-        if: steps.decide.outcome == 'failure'
-        run: exit 1
 
       # `inputs.dry-run` is absent on a scheduled run, and an absent input compares equal to `false` —
       # so the event is named first. A schedule reads and never writes (FR-003).
