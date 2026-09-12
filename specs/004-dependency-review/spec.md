@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Implemented 2026-09-12, not yet merged
+**Status**: Merged 2026-09-12, in no release yet
 
 **Input**: User description: "A pull request that introduces a dependency carrying a known advisory, or a licence this project will not accept, is refused before it merges. Nothing in this library does that today."
 
