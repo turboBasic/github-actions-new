@@ -100,17 +100,21 @@ grammar-job event gate, `blanket_permissions()`, `URL_OWNER_REPO`.
 
 ## The completeness check
 
-The feature's own success criterion (SC-002) is that deleting any single gate reddens the suite. To
-confirm no gate is redundant with another:
+The feature's own success criterion (SC-002) is that deleting any single gate reddens the suite. Break
+the **rule**, not the test: for each row in the tables above, apply the edit, run the suite, record which
+tests fail, restore. Every rule must be caught by at least one gate — a rule nothing catches is a rule
+this feature failed to hold.
 
-```bash
-# for each new test function: comment out its body, run the suite, restore it
-mise run test
-```
+Commenting a test body out proves nothing, because a body that asserts nothing cannot fail. The edit has
+to be to the artefact.
 
-Every one must produce exactly one failure. A gate whose removal changes nothing is a gate to delete
-rather than keep, and a gate whose removal reddens *two* tests means two gates hold one fact — which is
-principle I inside the suite.
+**More than one gate catching an edit is not redundancy.** One edit can break several rules — deleting a
+`commit_parsers` entry removes a type's destination *and* a section, and adding a type to the grammar
+gives it nowhere to go — and the notes are deliberately held twice over, once by reading the
+configuration and once by rendering it, because a rotted pattern leaves the configuration valid. Two
+gates hold one fact only when the same *rule*, edited alone, reddens both for the same reason.
+
+`tmp/` is the place for the script that does this; it is scratch, not an artefact.
 
 ## What is deliberately not verifiable here
 

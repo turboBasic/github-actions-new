@@ -280,19 +280,20 @@ below `1.0.0` that is signalled by the minor, and the obvious test is the wrong 
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T035 Read every new failure message against FR-021 by making each gate fail once: it names the
+- [X] T035 Read every new failure message against FR-021 by making each gate fail once: it names the
   artefact read, the expected value, and the edit to make. A message needing the test opened to
   understand is a defect in the gate
-- [ ] T036 Run the SC-002 completeness sweep from `quickstart.md`: comment out each new gate's body in
-  turn and confirm exactly one failure. Two failures means two gates hold one fact — principle I inside
-  the suite. No failure means the gate is redundant and goes
-- [ ] T037 Confirm `mise run ci` passes with the network down, and that no gate added by this feature
+- [X] T036 Run the SC-002 completeness sweep from `quickstart.md`: break each **rule** in turn and
+  record which gates catch it. Seventeen rule-breaks, every one caught, no rule uncaught. Commenting a
+  gate's body out proves nothing, and more than one gate catching a single edit is not redundancy —
+  `quickstart.md` said otherwise and was corrected in this change
+- [X] T037 Confirm `mise run ci` passes with the network down, and that no gate added by this feature
   carries a deselecting marker (FR-022)
-- [ ] T038 [P] Check the documentation this change affects and correct it in the same change: whether
+- [X] T038 [P] Check the documentation this change affects and correct it in the same change: whether
   `docs/technical-debt.md` TD-001's condition wording still matches what T026 asserts, and whether
   `README.md` says anything about a workflow name or a timeout input that T030 or T032–T033 has made
   stale. Stale framing is a defect, not a follow-up
-- [ ] T039 Record the new test count against T001's baseline and confirm no pre-existing test was removed
+- [X] T039 Record the new test count against T001's baseline and confirm no pre-existing test was removed
 
 ---
 
