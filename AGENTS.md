@@ -18,7 +18,7 @@ Four layers, the most abstract first.
 | --- | --- | --- | --- | --- |
 | 1 | Invariants | what may never be violated | amended and versioned, rarely | `.specify/memory/constitution.md` |
 | 2 | Conventions | how work is done here | edited as practice settles | `docs/ai-instructions.md` |
-| 3 | Mechanics | the procedures and the gates | moves with the code | `README.md`, `docs/technical-debt.md`, `tests/`, and the configs below |
+| 3 | Mechanics | the procedures and the gates | moves with the code | `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `docs/technical-debt.md`, `tests/`, and the configs below |
 | 4 | Navigation | where each fact lives | moves when an artefact does | this file, `CLAUDE.md`, `.github/copilot-instructions.md` |
 
 How each tool reaches the rule layers differs, and layer 4 is where that difference is absorbed.
@@ -31,6 +31,9 @@ and reaches the rule layers by link. Layer 3 is read on demand by both.
 | Artefact | Answers |
 | --- | --- |
 | `README.md` | what this repository is for, and what it currently ships |
+| `CONTRIBUTING.md` | the setup, the loop, how a workflow change is verified, the label set, and how a release is cut |
+| `SECURITY.md` | how something exploitable is reported, and what counts as in scope |
+| `CODE_OF_CONDUCT.md` | what taking part requires |
 | `docs/technical-debt.md` | which shortcuts are deliberate, and the condition that clears each |
 | `docs/instruction-layers.md` | the layering itself, explained for another repository to adopt |
 | `tests/` | every rule a gate holds |

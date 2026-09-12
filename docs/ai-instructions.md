@@ -21,7 +21,10 @@ assuming, extend it, and never regenerate it. The entry point names which file h
 
 A user-level instruction file is concatenated into context ahead of this one with no override
 mechanism, so a contradiction between the two has nowhere else to be resolved. **This repository's
-rules win where they are stricter.**
+rules win where they are stricter.** Two are live today. A user-level file that permits a third-party
+action pinned to a tag rather than a full commit SHA does not permit one here, and one that permits
+`@main` for an in-house reference does not permit it here — nothing of this repository's own names a ref
+at all.
 
 ### Changes to these rules
 
@@ -115,6 +118,8 @@ restores the world.
   consumer does not control — that agreement is the only reason a local verdict and a CI verdict match.
 - **An input named for a stage governs that stage entirely.** If it leaves some part of the stage
   running, it is misnamed.
+- **`env` does not propagate from a caller into a called workflow.** Anything a capability needs from
+  its caller arrives as an `input`.
 
 ### Python
 
@@ -125,6 +130,13 @@ Python 3.14. The only Python here supports the actions and their tests.
 - Full type hints on every signature, tests included.
 - A script invoked by a composite action reads its arguments from the environment, declared in
   `action.yml`. It never parses `${{ }}` interpolations inline.
+- **A module a composite action runs imports the standard library and nothing else, and keeps to syntax
+  an older interpreter parses.** mise pins 3.14 here, but a caller whose own configuration pins no
+  `python` falls back to the runner's, and `python3` is what runs the file — there is no resolution step
+  to fail loudly. Its imports are asserted against `sys.stdlib_module_names` by test.
+- **A module a composite action runs is importable by the suite and by the type checker.** A hyphen in
+  the directory it sits in means neither can reach it as a package, so the suite's own path setup and
+  pyright's `extraPaths` each name that directory. Both are needed; neither is a relaxation.
 
 ### Comments and docs
 
@@ -149,6 +161,10 @@ Python 3.14. The only Python here supports the actions and their tests.
   repointed.
 - **Pre-flight the line out of the file, never a retyping of it**, or you test your typing rather than
   the file.
+- **This repository stays public, or every consumer needs an access policy.** A private caller resolves
+  these capabilities only because this one is public; make it private and each consumer has to allow
+  access to repositories this owner holds before anything of theirs resolves again. Asserting it would
+  need the network, so it is stated here and held nowhere.
 
 ## Shipping
 
