@@ -81,6 +81,13 @@ def is_capability(doc: Doc) -> bool:
     return "workflow_call" in triggers(doc)
 
 
+def is_call_only(doc: Doc) -> bool:
+    # A workflow reachable only by a call never has a run of its own, so its entry in the Actions
+    # sidebar is permanently empty. Read from the trigger set, so a workflow gaining a trigger stops
+    # being one of these without a list needing to be edited.
+    return set(triggers(doc)) == {"workflow_call"}
+
+
 def jobs(doc: Doc) -> Doc:
     return cast(Doc, doc.get("jobs", {}))
 
