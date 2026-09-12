@@ -1,4 +1,4 @@
-name: pr-description
+name: 🧩 pr-description
 
 on:
   workflow_call:

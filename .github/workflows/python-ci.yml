@@ -1,4 +1,4 @@
-name: python-ci
+name: 🧩 python-ci
 
 on:
   workflow_call:

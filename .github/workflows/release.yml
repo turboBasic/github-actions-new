@@ -1,4 +1,4 @@
-name: release
+name: 🧩 release
 
 # `workflow_call` and nothing else. A caller's dependency edge is the only route here, which is what
 # keeps anything from reaching the tagging step around that edge — there is no event to arrive on.

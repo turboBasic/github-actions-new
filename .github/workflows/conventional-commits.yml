@@ -1,4 +1,4 @@
-name: conventional-commits
+name: 🧩 conventional-commits
 
 on:
   workflow_call:
