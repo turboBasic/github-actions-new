@@ -376,6 +376,45 @@ def test_the_changed_files_lint_is_gated_on_the_lint_stage_switch() -> None:
     )
 
 
+# A whole-tree lint, read from the command rather than from which branch of the `if` it sits in, so a
+# third path is covered the moment it is written.
+WHOLE_TREE_LINT = re.compile(r"prek run .*--all-files.*")
+SHOWS_THE_DIFF = "--show-diff-on-failure"
+
+
+def whole_tree_lints() -> list[str]:
+    run = next(
+        str(step.get("run", ""))
+        for step in steps_of("prek-advisory", "prek-advisory")
+        if step.get("id") == "lint"
+    )
+    return WHOLE_TREE_LINT.findall(run)
+
+
+def test_every_whole_tree_lint_reports_the_diff_that_would_fix_it() -> None:
+    found = whole_tree_lints()
+    assert len(found) >= 2, (
+        f"prek-advisory's lint step holds {len(found)} whole-tree invocations, and it has a staged "
+        "path and a default-stage one. This gate is reading the wrong step"
+    )
+    silent = [line for line in found if SHOWS_THE_DIFF not in line]
+    assert silent == [], (
+        f"whole-tree lints running without {SHOWS_THE_DIFF}: {silent}. A hook that rewrites a file "
+        "then reports only its own name, so the comment says which hook failed and not the change "
+        "that satisfies it"
+    )
+
+
+def test_the_whole_tree_lint_reader_finds_a_line_the_flag_is_gone_from() -> None:
+    # Pre-flight: every line above carries the flag, so the gate can never show that it reads a line
+    # by the invocation rather than by the flag it is looking for.
+    stripped = [line.replace(f"{SHOWS_THE_DIFF} ", "") for line in whole_tree_lints()]
+    assert stripped
+    for line in stripped:
+        assert WHOLE_TREE_LINT.fullmatch(line), line
+        assert SHOWS_THE_DIFF not in line
+
+
 # What a step does, read from the command it runs rather than from a list this test also keeps. A step
 # creating a ref names one of these; nothing else in the release path does.
 CREATES_A_REF = ("git/refs", "git/tags", "gh release create")

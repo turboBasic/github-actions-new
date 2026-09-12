@@ -73,11 +73,14 @@ jobs:
           HOOK_STAGE: ${{ inputs.hook-stage }}
         run: |
           # The finding is advisory, so a failing hook must not fail this step. Everything above may.
+          # `--show-diff-on-failure`: a hook that rewrites a file reports only its own name otherwise,
+          # so acting on the comment would mean reproducing the run locally — which is what reporting
+          # it in the pull request exists to save.
           status=0
           if [ -n "$HOOK_STAGE" ]; then
-            prek run --all-files --stage "$HOOK_STAGE" > "$RUNNER_TEMP/findings.txt" 2>&1 || status=$?
+            prek run --show-diff-on-failure --all-files --stage "$HOOK_STAGE" > "$RUNNER_TEMP/findings.txt" 2>&1 || status=$?
           else
-            prek run --all-files > "$RUNNER_TEMP/findings.txt" 2>&1 || status=$?
+            prek run --show-diff-on-failure --all-files > "$RUNNER_TEMP/findings.txt" 2>&1 || status=$?
           fi
           cat "$RUNNER_TEMP/findings.txt"
           printf 'clean=%s\n' "$([ "$status" -eq 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
