@@ -357,3 +357,56 @@ User Story 1 (T001–T003a) is the entire capability's value; Story 2 is a prope
 adds rather than a second change, and Story 3 is what makes the capability honest about what it does
 not judge and adoptable at all. So Phases 3–5 are one unit and one pull request, and Phase 6 is the
 only part that may follow.
+
+---
+
+## Phase 8: Convergence
+
+Every gate this feature added is in the tree and `mise run ci` is green, so nothing below changes what
+the capability does. What is unmet is FR-022 on two of the four new gates and FR-024 on one: a
+pre-flight that retypes the comparison rather than calling the gate's own reader asserts nothing about
+the gate, which is the failure the conventions layer names as *"Pre-flight the line out of the file,
+never a retyping of it."*
+
+- [X] T017 Make `test_the_with_key_check_would_catch_an_extra_key`
+  (`tests/test_workflow_properties.py:160`) plant the violation through the gate's own reader per FR-022
+  (partial). Today it builds a literal `{"fail-on-severity": ..., "comment-summary-in-pr": "always"}`
+  and asserts the set differs from `{ALLOWED_REVIEW_INPUT}` — a comparison of two literals that calls
+  no code the gate at `:151` uses, so a `review_with_keys` that stopped reading `with:` would report
+  green with this still passing. Give `review_with_keys` the step list as a parameter (as
+  `uses_slugs(steps)` already takes one) so the real gate passes `steps_of("dependency-review",
+  "dependency-review")` and the pre-flight passes a synthetic list carrying the `review` step with
+  `comment-summary-in-pr: always`, asserting the returned key set is what reddens. Mirror
+  `test_the_uses_slug_reader_refuses_a_checkout_beside_the_real_step` at `:125`, which is the shape this
+  file already gets right.
+
+- [X] T018 Make `test_the_input_spec_check_would_catch_a_missing_description`
+  (`tests/test_workflow_properties.py:182`) exercise the gate rather than a retyping of it per FR-022
+  (partial). The gate at `:166` holds its per-input check inline, so there is nothing for a pre-flight
+  to call: factor the two assertions into a helper taking a capability name and an input-name-to-spec
+  mapping and returning the list of complaints, have the gate call it over `declared_input_specs(doc)`,
+  and have the pre-flight call the same helper with a synthetic spec missing `description` and another
+  missing `default`, asserting it names each. Assert the real gate still returns an empty list over the
+  tree.
+
+- [X] T019 Pair `test_the_release_exclude_list_names_exactly_the_non_capability_workflows`
+  (`tests/test_workflow_properties.py:228`) with a violation-planting check per FR-022 (partial). It is
+  the one new gate that arrived with none, which is also what makes `data-model.md`'s gate table and
+  `quickstart.md`'s "each beside the check that plants its violation" untrue — and those live in a
+  completed `specs/` directory that is never edited again, so the gate is what has to become true. Its
+  set equality is two-sided, so factor out the comparison rather than the readers: a helper taking the
+  excluded set and the caller set and returning whether they agree, pre-flighted with a caller absent
+  from `exclude` and with a stale entry naming a workflow that is now a capability — the two directions
+  the gate's message already claims to catch. Both readers returning empty is the one state the equality
+  passes vacuously; assert the real caller set is non-empty so it cannot.
+
+- [X] T020 Move the remediation clause of `test_every_published_workflow_input_documents_itself`
+  (`tests/test_workflow_properties.py:179`) out of the comment and into the failure message per FR-024
+  (partial). The message is `"; ".join(missing)`, which names the capability, the input and which key is
+  absent but nothing a maintainer should change; the sentence FR-024's third clause wants — that an
+  input whose behaviour when unset is unwritten is a promise with nothing behind it, and that the fix is
+  a `description` and an explicit `default` on the input in its own workflow file — sits in the comment
+  at `:167` where no failing run prints it. Keep the comment's requirement citation.
+
+**Checkpoint**: `mise run ci` green, and each of the four gates this feature added can be shown red by
+a check in the suite rather than only by hand.

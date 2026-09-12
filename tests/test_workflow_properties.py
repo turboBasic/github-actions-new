@@ -139,17 +139,13 @@ def test_the_uses_slug_reader_refuses_a_checkout_beside_the_real_step() -> None:
 ALLOWED_REVIEW_INPUT = "fail-on-severity"
 
 
-def review_with_keys() -> set[str]:
-    step = next(
-        step
-        for step in steps_of("dependency-review", "dependency-review")
-        if step.get("id") == "review"
-    )
+def review_with_keys(steps: list[Doc]) -> set[str]:
+    step = next(step for step in steps if step.get("id") == "review")
     return {str(key) for key in cast(Doc, step.get("with") or {})}
 
 
 def test_dependency_review_passes_the_action_only_its_one_input() -> None:
-    keys = review_with_keys()
+    keys = review_with_keys(steps_of("dependency-review", "dependency-review"))
     assert keys == {ALLOWED_REVIEW_INPUT}, (
         f"dependency-review's review step passes {sorted(keys)}, the one key this capability allows "
         f"is {ALLOWED_REVIEW_INPUT!r}. comment-summary-in-pr at always or on-failure demands "
@@ -157,33 +153,55 @@ def test_dependency_review_passes_the_action_only_its_one_input() -> None:
     )
 
 
-def test_the_with_key_check_would_catch_an_extra_key() -> None:
-    # Pre-flight the same logic on a synthetic `with:` block, proving the gate above would catch it.
-    keys = {str(key) for key in {"fail-on-severity": "low", "comment-summary-in-pr": "always"}}
-    assert keys != {ALLOWED_REVIEW_INPUT}
+def test_the_with_key_reader_finds_the_extra_key_beside_the_allowed_one() -> None:
+    # Pre-flight the reader. Its steady state is a one-element set, so a reader that stopped finding
+    # the `with:` block would report green over a capability demanding pull-requests: write.
+    keys = review_with_keys(
+        [{"id": "review", "with": {"fail-on-severity": "low", "comment-summary-in-pr": "always"}}]
+    )
+    assert keys == {ALLOWED_REVIEW_INPUT, "comment-summary-in-pr"}
+
+
+def undocumented_inputs(name: str, specs: dict[str, Doc]) -> list[str]:
+    complaints: list[str] = []
+    for input_name, spec in specs.items():
+        if not str(spec.get("description", "")).strip():
+            complaints.append(f"{name}: input {input_name!r} has no description")
+        if "default" not in spec:
+            complaints.append(f"{name}: input {input_name!r} has no default")
+    return complaints
 
 
 def test_every_published_workflow_input_documents_itself() -> None:
-    # FR-004. An input whose behaviour when unset is unwritten is a promise with nothing behind it.
+    # FR-004.
     committed = fixture()
     missing: list[str] = []
     for name, doc in workflow_docs().items():
         row = committed.get(name, {})
         if not (row.get("kind") == "workflow" and row.get("published")):
             continue
-        for input_name, spec in declared_input_specs(doc).items():
-            if not str(spec.get("description", "")).strip():
-                missing.append(f"{name}: input {input_name!r} has no description")
-            if "default" not in spec:
-                missing.append(f"{name}: input {input_name!r} has no default")
-    assert missing == [], "; ".join(missing)
+        missing += undocumented_inputs(name, declared_input_specs(doc))
+    assert missing == [], (
+        "; ".join(missing) + ". An input whose behaviour when unset is unwritten is a promise with "
+        "nothing behind it: give it a description and an explicit default in the workflow that "
+        "declares it"
+    )
 
 
-def test_the_input_spec_check_would_catch_a_missing_description() -> None:
-    # Pre-flight on a synthetic input spec, or a change that stopped this reading anything reports
-    # green over a published input nobody documented.
-    spec: Doc = {"type": "string", "default": "low"}
-    assert not str(spec.get("description", "")).strip()
+def test_the_input_spec_check_names_the_key_each_input_is_missing() -> None:
+    # Pre-flight the check. Its steady state is an empty list, so a check that stopped reading a spec
+    # would report green over a published input nobody documented.
+    complaints = undocumented_inputs(
+        "synthetic",
+        {
+            "no-description": {"type": "string", "default": "low"},
+            "no-default": {"type": "string", "description": "the floor a finding fails at"},
+        },
+    )
+    assert complaints == [
+        "synthetic: input 'no-description' has no description",
+        "synthetic: input 'no-default' has no default",
+    ]
 
 
 def find_graph_off_step(steps: list[Doc]) -> Doc | None:
@@ -225,6 +243,12 @@ def test_the_graph_off_finder_reports_the_absence_rather_than_passing() -> None:
     assert find_graph_off_step([{"id": "review"}]) is None
 
 
+def exclude_disagreement(excluded: set[str], callers: set[str]) -> tuple[set[str], set[str]]:
+    # The two directions separately: callers no exclude entry names, then entries naming a workflow
+    # that is a capability now. A bare `==` would name neither in the failure.
+    return callers - excluded, excluded - callers
+
+
 def test_the_release_exclude_list_names_exactly_the_non_capability_workflows() -> None:
     # FR-018. Read at release time and nowhere else, so a caller missing here has no symptom until it
     # skews a version decision — the failure mode is silence, which is why this is a gate.
@@ -239,12 +263,29 @@ def test_the_release_exclude_list_names_exactly_the_non_capability_workflows() -
         for name, doc in workflow_docs().items()
         if not is_capability(doc)
     }
-    assert excluded == callers, (
-        f"[tool.turbobasic-release].exclude names {sorted(excluded)} under .github/workflows/; the "
-        f"workflows that are not capabilities are {sorted(callers)}. A caller missing from exclude "
-        "makes a later edit to this repository's own call site count towards a break; an entry naming "
-        "a workflow that has since become a capability is stale"
+    # Two empty sets agree, which is the one state this gate passes without reading the tree.
+    assert callers, (
+        "no workflow in the tree reads as a caller, so the comparison below would agree over nothing. "
+        "is_capability or workflow_docs has stopped reading the tree — fix the reader, not this gate"
     )
+    unlisted, stale = exclude_disagreement(excluded, callers)
+    assert not unlisted and not stale, (
+        f"[tool.turbobasic-release].exclude does not name {sorted(unlisted)}, and names "
+        f"{sorted(stale)} which are capabilities. A caller missing from exclude makes a later edit to "
+        "this repository's own call site count towards a break; an entry naming a workflow that has "
+        "since become a capability keeps consumer surface out of the range a release reads"
+    )
+
+
+def test_the_exclude_comparison_names_both_directions_it_claims_to_catch() -> None:
+    # Pre-flight the comparison. Set equality alone would report a disagreement without saying which
+    # side, and the gate's message promises both.
+    unlisted, stale = exclude_disagreement(
+        {".github/workflows/ci.yml", ".github/workflows/release.yml"},
+        {".github/workflows/ci.yml", ".github/workflows/advisory.yml"},
+    )
+    assert unlisted == {".github/workflows/advisory.yml"}
+    assert stale == {".github/workflows/release.yml"}
 
 
 def test_no_capability_takes_an_input_governing_the_cache() -> None:
