@@ -30,8 +30,9 @@ Two things a call site cannot show, and which apply to every capability below:
   annotation, and no condition able to skip past it. That is why each capability's demand is part of
   what it publishes rather than something a first run teaches you.
 
-Nothing is released yet, so the ref every call site below pins does not resolve. Versioning says what
-will be there to pin.
+Every call site below pins the moving ref. It resolves, but a capability merged since the last release
+is not on it until a release moves it there — and a break starts a new line instead, leaving the old
+ref where it is. Versioning says which ref to pin.
 
 ### `python-ci`
 
