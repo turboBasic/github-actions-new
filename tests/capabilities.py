@@ -11,6 +11,7 @@ REPO = Path(__file__).resolve().parent.parent
 WORKFLOW_DIR = REPO / ".github" / "workflows"
 ACTION_DIR = REPO / "actions"
 RULESET_DIR = REPO / ".github" / "rulesets"
+CONVENTIONAL_COMMITS = WORKFLOW_DIR / "conventional-commits.yml"
 FIXTURE = Path(__file__).parent / "published_surface.toml"
 
 Doc = dict[Any, Any]
@@ -190,6 +191,16 @@ def composed_contexts() -> list[ComposedContext]:
                     )
                 )
     return out
+
+
+def allowed_commit_types() -> list[str]:
+    # The grammar both required checks judge against, declared once as that capability's own default.
+    # Read here rather than restated, so the notes gate and the grammar gate cannot disagree about
+    # which types exist.
+    call: Any = triggers(load(CONVENTIONAL_COMMITS)).get("workflow_call") or {}
+    inputs = cast(Doc, cast(Doc, call).get("inputs", {}))
+    default = cast(Doc, inputs.get("types", {})).get("default", "")
+    return [line.strip() for line in str(default).splitlines() if line.strip()]
 
 
 def declared_inputs(doc: Doc) -> set[str]:
