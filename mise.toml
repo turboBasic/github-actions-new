@@ -52,6 +52,7 @@ run = [
   "cspell lint --no-progress .",
   "uv run check-jsonschema --builtin-schema vendor.github-issue-forms .github/ISSUE_TEMPLATE/[0-9]-*.yml",
   "uv run check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml",
+  "uv run check-jsonschema --builtin-schema vendor.github-actions actions/*/action.yml",
   "uv run check-jsonschema --builtin-schema custom.github-workflows-require-timeout .github/workflows/*.yml",
 ]
 
