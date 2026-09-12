@@ -27,6 +27,11 @@ tamasfe
 zizmorcore
 
 # --- Library and API identifiers ---
+# GitHub advisory ids and the OpenSSF Scorecard, both named by dependency-review-action's inputs;
+# NOASSERTION is SPDX's own token for a licence a package declares nothing about
+ghsas
+NOASSERTION
+OpenSSF
 pyupgrade
 rawfile
 schemafile

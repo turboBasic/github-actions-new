@@ -208,6 +208,13 @@ def declared_inputs(doc: Doc) -> set[str]:
     return {str(name) for name in cast(Doc, call).get("inputs", {})}
 
 
+def declared_input_specs(doc: Doc) -> dict[str, Doc]:
+    # Each input's own mapping, so a caller can check for `description` and `default` without a
+    # second YAML walk.
+    call: Any = triggers(doc).get("workflow_call") or {}
+    return {str(name): cast(Doc, spec) for name, spec in cast(Doc, call).get("inputs", {}).items()}
+
+
 def action_inputs(doc: Doc) -> set[str]:
     return {str(name) for name in cast(Doc, doc.get("inputs", {}))}
 

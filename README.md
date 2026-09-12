@@ -1,6 +1,6 @@
 # turboBasic/github-actions
 
-Five reusable GitHub Actions workflows for `turboBasic` repositories. Every published capability is a
+Reusable GitHub Actions workflows for `turboBasic` repositories. Every published capability is a
 callable workflow: none is offered as a composite action a consumer places in a job it already owns.
 
 The work is staged at
@@ -297,6 +297,33 @@ CI without handing write access to your pull requests.
 
 **Pass the same `hook-stage` you pass to `python-ci`.** Different stages mean the two runs disagree
 about which checks apply, and the comment then reports on a set of hooks the blocking check never ran.
+
+### `dependency-review`
+
+Reads the dependency-graph difference between a pull request's base and its head, and reddens on an
+advisory at or above a severity floor. It is the only capability here judging what a change starts
+depending on rather than what it says.
+
+```yaml
+jobs:
+  guard:
+    permissions:
+      contents: read
+    uses: turboBasic/github-actions-new/.github/workflows/dependency-review.yml@v0.1
+```
+
+Required context: `guard / dependency-review` — your own job id, then the called job's name. It may be
+required only under `pull_request`: requiring it under any other event gives a check that reports
+success without reading anything, because there is no base and no head to difference.
+
+What reddens the check: an advisory at or above the severity floor. What only appears in the run's
+output and never fails anything: a finding below the floor, an OpenSSF Scorecard warning, and an
+unlicensed dependency — with no licence policy configured, a licence is reported and never refused;
+refusing a named licence is a second input this capability does not take.
+
+**Your repository's own dependency graph has to be switched on.** This capability cannot switch it on
+for you: with the setting off, the run fails naming it and the `settings/security_analysis` path to
+change it, and says it cannot make that change on your behalf.
 
 ## Versioning
 

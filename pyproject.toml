@@ -67,6 +67,7 @@ exclude = [
   ".github/workflows/apply-ruleset.yml",
   ".github/workflows/ci.yml",
   ".github/workflows/commit-messages.yml",
+  ".github/workflows/dependency-guard.yml",
   ".github/workflows/describe-pr.yml",
   ".github/workflows/release-on-merge.yml",
   ".github/workflows/release-proposal.yml",
