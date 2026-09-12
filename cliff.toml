@@ -13,6 +13,9 @@ body = """
 {% endfor %}"""
 footer = ""
 trim = true
+postprocessors = [
+  { pattern = '<!--[0-9]+-->', replace = "" },
+]
 
 [git]
 conventional_commits = true
@@ -25,13 +28,16 @@ protect_breaking_commits = true
 # last release moved it to rather than at the last release.
 tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 
+# The `<!--N-->` prefix is the only statement of a section's position, and a postprocessor strips it
+# again. Groups are sorted by their string, so without a number the order is alphabetical and
+# retitling a section silently moves it.
 commit_parsers = [
-  { message = "^feat", group = "Added" },
-  { message = "^fix", group = "Fixed" },
-  { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Changed" },
-  { message = "^revert", group = "Reverted" },
-  { message = "^docs", group = "Documentation" },
+  { message = "^feat", group = "<!--1-->Added" },
+  { message = "^fix", group = "<!--2-->Fixed" },
+  { message = "^perf", group = "<!--3-->Performance" },
+  { message = "^refactor", group = "<!--4-->Changed" },
+  { message = "^revert", group = "<!--5-->Reverted" },
+  { message = "^docs", group = "<!--6-->Documentation" },
   # Nothing a consumer resolving a ref can observe. A range holding only these renders no notes, and
   # the release is refused for having nothing to publish — which is the right answer, not a gap.
   { message = "^(build|bump|chore|ci|style|test)", skip = true },

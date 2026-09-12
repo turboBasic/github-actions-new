@@ -59,6 +59,68 @@ def test_every_allowed_type_reaches_a_destination() -> None:
     )
 
 
+# The published shape of a release body: six sections, these titles, this order. Written out rather
+# than read from the order the parsers happen to be declared in — a gate taking its expectation from
+# the artefact it judges would follow a reorder instead of failing it.
+#
+# There is no seventh. A breaking change keeps its own type's section and is marked on its own item,
+# so a breaking-changes section appearing here is a change to what a release publishes.
+SECTIONS = (
+    (1, "Added"),
+    (2, "Fixed"),
+    (3, "Performance"),
+    (4, "Changed"),
+    (5, "Reverted"),
+    (6, "Documentation"),
+)
+
+# Tera sorts groups by their string, so the number is what puts a section in its place, and a
+# postprocessor strips it again. It is the only statement of position anywhere: without it the order
+# is alphabetical, which makes a retitle silently a reorder.
+ORDERING_PREFIX = re.compile(r"^<!--(\d+)-->(.*)$")
+
+
+def numbered_sections() -> tuple[list[tuple[int, str]], list[str]]:
+    numbered: list[tuple[int, str]] = []
+    unprefixed: list[str] = []
+    for group in dict.fromkeys(
+        str(parser["group"]) for parser in parsers() if parser.get("group") is not None
+    ):
+        match = ORDERING_PREFIX.match(group)
+        if match is None:
+            unprefixed.append(group)
+        else:
+            numbered.append((int(match.group(1)), match.group(2)))
+    return numbered, unprefixed
+
+
+def test_the_six_sections_keep_their_titles_and_their_order() -> None:
+    numbered, unprefixed = numbered_sections()
+    assert unprefixed == [], (
+        f"{CLIFF.name} has group names carrying no `<!--N-->` ordering prefix: {unprefixed}. Without a "
+        "number the sections render in alphabetical order, so retitling one moves it. Prefix every "
+        f"group with its position from {[f'{n} {title}' for n, title in SECTIONS]}"
+    )
+    numbers = [number for number, _ in numbered]
+    assert len(numbers) == len(set(numbers)), (
+        f"{CLIFF.name} gives two sections the same position: {sorted(numbered)}. Two groups sharing a "
+        "number render in an order nothing states"
+    )
+    assert sorted(numbered) == list(SECTIONS), (
+        f"{CLIFF.name} declares sections {sorted(numbered)}; a release body publishes exactly "
+        f"{list(SECTIONS)}. A retitle, a reorder, a seventh section or a removed one all change what a "
+        "release says it contains — if the change is intended, change SECTIONS in the same commit"
+    )
+
+
+def test_the_ordering_prefix_reader_finds_a_number_it_is_given() -> None:
+    # Pre-flight the matcher, or a change that stops it matching reports green over a body rendering
+    # every section in the wrong place with the markers still visible.
+    match = ORDERING_PREFIX.match("<!--3-->Performance")
+    assert match is not None and match.groups() == ("3", "Performance")
+    assert ORDERING_PREFIX.match("Performance") is None
+
+
 # A release the notes are cut for. The range runs from the last of these, so anything else matching
 # would start it somewhere that is not a release.
 EXACT_VERSIONS = ("v1.2.3", "v0.1.0", "v10.20.30")
