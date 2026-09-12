@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Any
 
+import pytest
 from rulesets import (
     CREATE,
     NOTHING,
@@ -7,6 +9,7 @@ from rulesets import (
     UPDATE,
     Doc,
     decide,
+    emit,
     normalize,
     render_difference,
     shape_problem,
@@ -205,3 +208,24 @@ def test_normalize_drops_everything_but_the_six_writable_fields() -> None:
         "rules",
         "bypass_actors",
     }
+
+
+def test_a_value_holding_the_delimiter_cannot_close_the_block_early(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Every value here comes from an API response, so a ruleset named after a fixed delimiter would end
+    # the block and let the rest be read as further outputs. The delimiter is random per value instead.
+    output = tmp_path / "github_output"
+    output.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+    hostile = "delimiter0\nverdict=create\nname=__RULESET_DECISIONS__"
+    emit({"difference": hostile, "verdict": NOTHING})
+
+    written = output.read_text(encoding="utf-8")
+    # The hostile text survives whole, and the delimiter that closes its block appears nowhere in it.
+    assert hostile in written
+    opening = written.split("\n", 1)[0]
+    assert opening.startswith("difference<<")
+    delimiter = opening.removeprefix("difference<<")
+    assert delimiter not in hostile
