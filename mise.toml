@@ -9,6 +9,11 @@ git-cliff = "2.14.1"
 "pipx:specify-cli" = "1.0.4"
 prek = "0.5.2"
 python = "3.14"
+# actionlint shells out to shellcheck for every `run:` block when it is on PATH, and skips that
+# analysis without a word when it is not. Most of what this repository executes is shell inside YAML,
+# so an absent pin would leave `mise run lint` and the `actionlint-system` hook both reading less than
+# they appear to.
+shellcheck = "0.11.0"
 taplo = "0.10.0"
 uv = "0.12.10"
 zizmor = "1.30.0"
