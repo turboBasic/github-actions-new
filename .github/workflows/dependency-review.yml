@@ -1,0 +1,38 @@
+name: 🧩 dependency-review
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-severity:
+        description: >-
+          The lowest advisory severity that reddens the check. Anything below it still appears in the
+          job summary and never fails the run.
+        type: string
+        default: low
+
+permissions: {}
+
+jobs:
+  dependency-review:
+    name: dependency-review
+    # Registered in the surface fixture's skip table. There is no base and no head to difference under
+    # any other event, so there is nothing to judge.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # the difference is read from the API with this token
+    steps:
+      - id: review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: ${{ inputs.fail-on-severity }}
+
+      # The action's own 403 already names the setting and its settings/security_analysis path; it
+      # cannot know that a called workflow has no way to switch that setting on for its caller, so this
+      # step says the one thing it doesn't. `dependency-changes` is set only once the comparison has
+      # actually been read, so this cannot fire on a run that failed over a real advisory.
+      - id: graph-off
+        if: failure() && steps.review.outputs.dependency-changes == ''
+        run: |
+          echo "::error::dependency-review could not read the dependency-graph difference for this repository. Check that Dependency graph is enabled at $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/settings/security_analysis — this capability cannot switch that setting on for you."

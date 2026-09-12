@@ -1,0 +1,18 @@
+name: 🌜 dependency-guard
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  # The job id composes the first half of the context: `guard / dependency-review`. Not required in
+  # this repository's own ruleset — an upstream advisory nobody has triaged must not block a merge.
+  guard:
+    permissions:
+      contents: read # the capability reads this repository's dependency-graph difference with it
+    uses: $/.github/workflows/dependency-review.yml

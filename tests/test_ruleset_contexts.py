@@ -35,12 +35,13 @@ def test_required_contexts_returns_nothing_for_a_ruleset_with_no_such_rule() -> 
 
 
 def test_composed_contexts_finds_the_contexts_the_tree_actually_reports() -> None:
-    # These four are confirmed against this repository's own reported check-run names, not guessed.
+    # Confirmed against this repository's own reported check-run names, not guessed.
     contexts = {c.context for c in composed_contexts()}
     assert "ci / python-ci" in contexts
     assert "commits / pr-title" in contexts
     assert "commits / commit-messages" in contexts
     assert "propose" in contexts
+    assert "guard / dependency-review" in contexts
 
 
 def _unresolved(ruleset_name: str, context: str) -> str:
@@ -160,3 +161,4 @@ def test_a_context_the_tree_composes_but_does_not_require_causes_no_failure() ->
     composed = {c.context for c in composed_contexts()}
     required = {context for doc in ruleset_docs().values() for context in required_contexts(doc)}
     assert "advisory / prek-advisory" in composed - required
+    assert "guard / dependency-review" in composed - required

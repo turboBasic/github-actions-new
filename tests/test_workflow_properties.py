@@ -1,5 +1,7 @@
 import re
+import tomllib
 from itertools import pairwise
+from typing import cast
 
 from capabilities import (
     CONVENTIONAL_COMMITS,
@@ -7,6 +9,7 @@ from capabilities import (
     WORKFLOW_DIR,
     Doc,
     action_paths,
+    declared_input_specs,
     declared_inputs,
     fixture,
     is_capability,
@@ -100,6 +103,148 @@ def test_the_permission_reader_tells_an_explained_grant_from_a_bare_one() -> Non
 
 def steps_of(name: str, job_id: str) -> list[Doc]:
     return list(jobs(load(WORKFLOW_DIR / f"{name}.yml"))[job_id]["steps"])
+
+
+def uses_slugs(steps: list[Doc]) -> set[str]:
+    # The slug is the part before `@`. The digest is deliberately not read here: the workflow owns
+    # the pin and test_action_pins.py owns whether it is a full SHA, so a bump stays a one-file edit.
+    return {str(step["uses"]).partition("@")[0] for step in steps if "uses" in step}
+
+
+def test_dependency_review_uses_only_the_pinned_action() -> None:
+    # FR-002, FR-015: no checkout and no task-runner step. The action reads the difference from the
+    # API, so a checkout beside it would be this capability reading a tree it has no reason to have.
+    slugs = uses_slugs(steps_of("dependency-review", "dependency-review"))
+    assert slugs == {"actions/dependency-review-action"}, (
+        f"dependency-review's job uses {sorted(slugs)}, expected exactly "
+        "{'actions/dependency-review-action'}. A checkout or a task-runner step here is what "
+        "FR-002/FR-015 forbid"
+    )
+
+
+def test_the_uses_slug_reader_refuses_a_checkout_beside_the_real_step() -> None:
+    # Pre-flight the reader (FR-022): its steady state is a one-element set, so a change that stopped
+    # it finding anything would report green over a capability that checks the caller's tree out.
+    slugs = uses_slugs(
+        [
+            {"uses": "actions/checkout@abc123"},
+            {"uses": "actions/dependency-review-action@a1d282b"},
+        ]
+    )
+    assert slugs == {"actions/checkout", "actions/dependency-review-action"}
+
+
+# The one key this capability passes the action. Every other key the action declares — the pull
+# request comment, a licence list, an override — stays unset, so the action's defaults are the policy.
+ALLOWED_REVIEW_INPUT = "fail-on-severity"
+
+
+def review_with_keys() -> set[str]:
+    step = next(
+        step
+        for step in steps_of("dependency-review", "dependency-review")
+        if step.get("id") == "review"
+    )
+    return {str(key) for key in cast(Doc, step.get("with") or {})}
+
+
+def test_dependency_review_passes_the_action_only_its_one_input() -> None:
+    keys = review_with_keys()
+    assert keys == {ALLOWED_REVIEW_INPUT}, (
+        f"dependency-review's review step passes {sorted(keys)}, the one key this capability allows "
+        f"is {ALLOWED_REVIEW_INPUT!r}. comment-summary-in-pr at always or on-failure demands "
+        "pull-requests: write, which every caller would then have to grant before any job exists"
+    )
+
+
+def test_the_with_key_check_would_catch_an_extra_key() -> None:
+    # Pre-flight the same logic on a synthetic `with:` block, proving the gate above would catch it.
+    keys = {str(key) for key in {"fail-on-severity": "low", "comment-summary-in-pr": "always"}}
+    assert keys != {ALLOWED_REVIEW_INPUT}
+
+
+def test_every_published_workflow_input_documents_itself() -> None:
+    # FR-004. An input whose behaviour when unset is unwritten is a promise with nothing behind it.
+    committed = fixture()
+    missing: list[str] = []
+    for name, doc in workflow_docs().items():
+        row = committed.get(name, {})
+        if not (row.get("kind") == "workflow" and row.get("published")):
+            continue
+        for input_name, spec in declared_input_specs(doc).items():
+            if not str(spec.get("description", "")).strip():
+                missing.append(f"{name}: input {input_name!r} has no description")
+            if "default" not in spec:
+                missing.append(f"{name}: input {input_name!r} has no default")
+    assert missing == [], "; ".join(missing)
+
+
+def test_the_input_spec_check_would_catch_a_missing_description() -> None:
+    # Pre-flight on a synthetic input spec, or a change that stopped this reading anything reports
+    # green over a published input nobody documented.
+    spec: Doc = {"type": "string", "default": "low"}
+    assert not str(spec.get("description", "")).strip()
+
+
+def find_graph_off_step(steps: list[Doc]) -> Doc | None:
+    # Found by id, never by retyping the condition — a reworded condition would then match nothing
+    # and this would report green over a missing diagnostic.
+    matches = [step for step in steps if step.get("id") == "graph-off"]
+    assert len(matches) <= 1, f"more than one step id 'graph-off': {matches}"
+    return matches[0] if matches else None
+
+
+def test_dependency_review_names_the_setting_it_cannot_switch_on() -> None:
+    # FR-011, FR-024.
+    step = find_graph_off_step(steps_of("dependency-review", "dependency-review"))
+    assert step is not None, (
+        "dependency-review names no step id 'graph-off'. Add one, gated on `failure() && "
+        "steps.review.outputs.dependency-changes == ''`, whose run: names the dependency-graph "
+        "setting and says this capability cannot switch it on for the caller"
+    )
+    condition = str(step.get("if", ""))
+    assert "failure()" in condition, (
+        f"graph-off runs under `if: {condition}`, which does not check failure() — it could fire on a "
+        "run that judged a real advisory"
+    )
+    assert "steps.review.outputs.dependency-changes" in condition, (
+        f"graph-off runs under `if: {condition}`, which does not read dependency-changes, the "
+        "discriminator between a run that read the comparison and one that judged nothing"
+    )
+    script = str(step.get("run", ""))
+    assert "security_analysis" in script, (
+        f"graph-off's run: {script!r} does not name the dependency-graph setting"
+    )
+    assert "cannot" in script.lower(), (
+        f"graph-off's run: {script!r} does not say this capability cannot switch the setting on"
+    )
+
+
+def test_the_graph_off_finder_reports_the_absence_rather_than_passing() -> None:
+    # Pre-flight the finder with a synthetic step list carrying no `graph-off` id.
+    assert find_graph_off_step([{"id": "review"}]) is None
+
+
+def test_the_release_exclude_list_names_exactly_the_non_capability_workflows() -> None:
+    # FR-018. Read at release time and nowhere else, so a caller missing here has no symptom until it
+    # skews a version decision — the failure mode is silence, which is why this is a gate.
+    config = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
+    excluded = {
+        str(entry)
+        for entry in config["tool"]["turbobasic-release"]["exclude"]
+        if str(entry).startswith(".github/workflows/")
+    }
+    callers = {
+        f".github/workflows/{name}.yml"
+        for name, doc in workflow_docs().items()
+        if not is_capability(doc)
+    }
+    assert excluded == callers, (
+        f"[tool.turbobasic-release].exclude names {sorted(excluded)} under .github/workflows/; the "
+        f"workflows that are not capabilities are {sorted(callers)}. A caller missing from exclude "
+        "makes a later edit to this repository's own call site count towards a break; an entry naming "
+        "a workflow that has since become a capability is stale"
+    )
 
 
 def test_no_capability_takes_an_input_governing_the_cache() -> None:
