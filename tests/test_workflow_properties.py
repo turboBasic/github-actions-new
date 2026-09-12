@@ -2,6 +2,7 @@ import re
 from itertools import pairwise
 
 from capabilities import (
+    CONVENTIONAL_COMMITS,
     REPO,
     WORKFLOW_DIR,
     Doc,
@@ -87,6 +88,16 @@ def test_every_permission_carries_its_reason_beside_it() -> None:
     )
 
 
+def test_the_permission_reader_tells_an_explained_grant_from_a_bare_one() -> None:
+    # Pre-flight the matcher. Its steady state is an empty result, so a pattern that stopped matching
+    # would report green over a tree of permissions nobody explained.
+    explained = PERMISSION.match("      contents: read # the range check checks this tree out")
+    assert explained is not None and (explained.group("reason") or "").strip()
+    bare = PERMISSION.match("      contents: read")
+    assert bare is not None and not (bare.group("reason") or "").strip()
+    assert PERMISSION.match("    timeout-minutes: 5") is None
+
+
 def steps_of(name: str, job_id: str) -> list[Doc]:
     return list(jobs(load(WORKFLOW_DIR / f"{name}.yml"))[job_id]["steps"])
 
@@ -103,6 +114,14 @@ def test_no_capability_takes_an_input_governing_the_cache() -> None:
         assert governing == [], (
             f"{name}: declares {governing}, but caching is not a call site's choice"
         )
+
+
+def test_the_cache_input_matcher_reads_a_name_it_is_given() -> None:
+    # Pre-flight the matcher, or a capability could declare a caching input and this gate would not see
+    # it. No capability declares one today, so the gate has nothing else to prove it works.
+    assert GOVERNS_A_CACHE.search("cache-key")
+    assert GOVERNS_A_CACHE.search("restore-cache")
+    assert not GOVERNS_A_CACHE.search("hook-stage")
 
 
 def test_the_lockfile_check_precedes_every_stage_of_python_ci() -> None:
@@ -189,6 +208,16 @@ def test_no_step_in_the_release_path_writes_a_version() -> None:
     assert offending == [], (
         f"release.yml authors a change: {offending}. It tags what was already decided, and a version "
         "it wrote itself would be a version no review ever saw"
+    )
+
+
+def test_the_version_writing_markers_match_a_step_that_authors_one() -> None:
+    # Pre-flight the markers. No step in the release path writes a version, which is the point, so the
+    # gate above can never demonstrate that its tuple still matches anything.
+    assert any(marker in 'git commit -m "chore: release v1.2.3"' for marker in WRITES_A_VERSION)
+    assert any(marker in "uv run cz bump --yes" for marker in WRITES_A_VERSION)
+    assert not any(
+        marker in "gh release create v1.2.3 --notes-file notes.md" for marker in WRITES_A_VERSION
     )
 
 
@@ -296,8 +325,16 @@ def test_no_workflow_anywhere_triggers_on_pull_request_target() -> None:
 def test_both_grammar_jobs_pin_the_event_they_can_judge() -> None:
     # Pinning the event is also what puts `pull_request_target` structurally out of reach: neither job
     # runs under any event but the one it reads a title and a range from.
-    doc = load(WORKFLOW_DIR / "conventional-commits.yml")
-    for job_id, job in jobs(doc).items():
+    doc = load(CONVENTIONAL_COMMITS)
+    found = jobs(doc)
+    # Without this the loop below passes over an empty map, so a reader that stopped finding jobs would
+    # report green while neither grammar check pinned its event.
+    assert len(found) == 2, (
+        f"conventional-commits declares jobs {sorted(found)}; this gate judges the two grammar jobs. "
+        "Reading a different number means it is looking at the wrong workflow, or a job appeared that "
+        "nothing here holds to an event"
+    )
+    for job_id, job in found.items():
         condition = str(job.get("if", ""))
         assert "github.event_name == 'pull_request'" in condition, (
             f"conventional-commits job {job_id} runs under `if: {condition}`, which does not pin the "

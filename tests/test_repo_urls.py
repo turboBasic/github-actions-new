@@ -51,7 +51,11 @@ def test_every_self_url_names_the_repository_this_clone_actually_is() -> None:
     slug = current_slug()
     stale: list[str] = []
     for path in tracked_files():
-        if path in EXEMPT or path.startswith((".specify/", ".claude/skills/speckit-")):
+        # This module owns the matcher, so it carries deliberate counter-examples that are meant not to
+        # be this repository — the same reason the slug gate below skips itself.
+        if path in EXEMPT or path == OWN_PATH:
+            continue
+        if path.startswith((".specify/", ".claude/skills/speckit-")):
             continue
         text = (REPO / path).read_text(encoding="utf-8", errors="ignore")
         stale += [f"{path}: {m}" for m in URL_OWNER_REPO.findall(text) if m != slug]
@@ -76,6 +80,16 @@ def test_every_self_reference_by_slug_names_the_repository_this_clone_is() -> No
         f"`uses:` names a repository other than {slug}: {stale}. A rename leaves the old slug "
         "resolving through GitHub's redirect, so nothing else would report this"
     )
+
+
+def test_the_url_reader_finds_a_self_url_it_is_given() -> None:
+    # Pre-flight the matcher, or a change that stops it matching reports green over stale URLs. Its
+    # sibling below has carried this since it was written; this one had not.
+    assert URL_OWNER_REPO.findall("see https://github.com/turboBasic/some-other-repo/issues/1") == [
+        "turboBasic/some-other-repo"
+    ]
+    assert URL_OWNER_REPO.findall("https://github.com/someone-else/github-actions") == []
+    assert URL_OWNER_REPO.findall("https://example.com/turboBasic/github-actions") == []
 
 
 def test_the_slug_reader_finds_a_reference_it_is_given() -> None:
