@@ -259,16 +259,16 @@ own pull request without touching any other story.
 
 **Depends on**: T003. **Contends with**: T012–T015 for `tests/test_workflow_properties.py`.
 
-- [ ] T031 [US5] Add FR-014 and FR-015 to `tests/test_workflow_properties.py`: the set of capabilities
+- [X] T031 [US5] Add FR-014 and FR-015 to `tests/test_workflow_properties.py`: the set of capabilities
   declaring a timeout input equals `{python-ci, prek-advisory}` exactly. Set equality, not a subset, is
   what makes it fail in both directions in one assertion. Record each member's justification beside it —
   the reason a knob exists is not derivable from the fact that it does. Fails now on two capabilities
-- [ ] T032 [US5] Remove the `timeout-minutes` input from `.github/workflows/conventional-commits.yml`
+- [X] T032 [US5] Remove the `timeout-minutes` input from `.github/workflows/conventional-commits.yml`
   and give both its jobs a literal `timeout-minutes`, satisfying FR-016 through the schema hook that
   already refuses a job without one
-- [ ] T033 [US5] Remove the `timeout-minutes` input from `.github/workflows/pr-description.yml` and give
+- [X] T033 [US5] Remove the `timeout-minutes` input from `.github/workflows/pr-description.yml` and give
   its job a literal `timeout-minutes`. T031 goes green
-- [ ] T034 [US5] Drop `timeout-minutes` from the `conventional-commits` and `pr-description` rows in
+- [X] T034 [US5] Drop `timeout-minutes` from the `conventional-commits` and `pr-description` rows in
   `tests/published_surface.toml`, in the same change as T032 and T033 so the release verdict is reached
   from a tree that tells the truth (FR-017). `test_published_surface.py` is what fails if either half is
   missing
@@ -284,7 +284,7 @@ below `1.0.0` that is signalled by the minor, and the obvious test is the wrong 
   artefact read, the expected value, and the edit to make. A message needing the test opened to
   understand is a defect in the gate
 - [X] T036 Run the SC-002 completeness sweep from `quickstart.md`: break each **rule** in turn and
-  record which gates catch it. Seventeen rule-breaks, every one caught, no rule uncaught. Commenting a
+  record which gates catch it. Nineteen rule-breaks, every one caught, no rule uncaught — the last two added with US5, so the sweep covers the partition too. Commenting a
   gate's body out proves nothing, and more than one gate catching a single edit is not redundancy —
   `quickstart.md` said otherwise and was corrected in this change
 - [X] T037 Confirm `mise run ci` passes with the network down, and that no gate added by this feature
