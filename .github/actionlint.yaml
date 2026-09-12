@@ -10,6 +10,10 @@
 # The pattern matches that one message and nothing else, so every genuinely malformed
 # reusable-workflow reference is still caught. See docs/technical-debt.md for what clears it.
 #
+# The silence expires on its own: tests/test_actionlint_ignore.py plants both forms outside this tree and
+# asks the pinned actionlint whether it still refuses them. The day one is accepted, that gate fails and
+# says to delete this file.
+#
 # No `check-jsonschema` hook guards this file, unlike every other config under .github/:
 # check-jsonschema ships no built-in schema for it, and a `--schemafile <url>` would put the network
 # in `mise run ci`. A mis-keyed entry here fails safe — the ignore stops applying and lint reddens.

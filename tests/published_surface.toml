@@ -62,7 +62,7 @@ published = true
 # Two jobs, so two contexts a consumer requires separately — and switching either check off means
 # retiring its context in the same change, or the ruleset keeps naming a gate that no longer reports.
 check_name = ["commit-messages", "pr-title"]
-inputs = ["check-commits", "check-title", "timeout-minutes", "types"]
+inputs = ["check-commits", "check-title", "types"]
 permissions = { contents = "read", pull-requests = "read" }
 tool_prerequisites = []
 
@@ -80,7 +80,7 @@ judges = false
 # Two inputs and nothing else. No token, no pull request number, no repository, no SHA range: the
 # capability owns its own checkout and reads all of it from the run, which is what removes the
 # shallow-checkout failure mode rather than documenting it.
-inputs = ["template-path", "timeout-minutes"]
+inputs = ["template-path"]
 permissions = { contents = "read", pull-requests = "write" }
 tool_prerequisites = []
 

@@ -1,4 +1,4 @@
-name: commit-messages
+name: 🌜 commit-messages
 
 # `edited` is not in the default activity set, and a corrected title is an edit rather than a push —
 # without it a fixed title leaves the old verdict standing with nothing to re-run it.

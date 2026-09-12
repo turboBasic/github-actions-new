@@ -121,6 +121,14 @@ def test_no_capability_grants_itself_every_scope() -> None:
         )
 
 
+def test_the_blanket_permission_reader_returns_a_block_that_names_no_scope() -> None:
+    # Pre-flight the reader. Nothing in the tree sets a blanket value, which is the point, so the gate
+    # above can never show that its reader would still find one.
+    blanket: Doc = {"permissions": "read-all", "jobs": {"one": {"permissions": "write-all"}}}
+    assert blanket_permissions(blanket) == ["workflow", "one"]
+    assert blanket_permissions({"permissions": {"contents": "read"}}) == []
+
+
 def test_check_name_is_absent_for_an_action_and_present_for_a_published_workflow() -> None:
     # A published workflow with no check name is a gate a consumer cannot require; an action
     # composes no context at all, so a check name on one would name nothing.

@@ -1,4 +1,4 @@
-name: describe-pr
+name: 🌜 describe-pr
 
 # `opened` alone, and deliberately not `synchronize`. Rewriting the body on every push would discard
 # whatever a human typed into it since — and the body is the one place they explain why, which no

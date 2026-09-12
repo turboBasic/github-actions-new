@@ -2,6 +2,7 @@ import re
 from itertools import pairwise
 
 from capabilities import (
+    CONVENTIONAL_COMMITS,
     REPO,
     WORKFLOW_DIR,
     Doc,
@@ -87,6 +88,16 @@ def test_every_permission_carries_its_reason_beside_it() -> None:
     )
 
 
+def test_the_permission_reader_tells_an_explained_grant_from_a_bare_one() -> None:
+    # Pre-flight the matcher. Its steady state is an empty result, so a pattern that stopped matching
+    # would report green over a tree of permissions nobody explained.
+    explained = PERMISSION.match("      contents: read # the range check checks this tree out")
+    assert explained is not None and (explained.group("reason") or "").strip()
+    bare = PERMISSION.match("      contents: read")
+    assert bare is not None and not (bare.group("reason") or "").strip()
+    assert PERMISSION.match("    timeout-minutes: 5") is None
+
+
 def steps_of(name: str, job_id: str) -> list[Doc]:
     return list(jobs(load(WORKFLOW_DIR / f"{name}.yml"))[job_id]["steps"])
 
@@ -103,6 +114,58 @@ def test_no_capability_takes_an_input_governing_the_cache() -> None:
         assert governing == [], (
             f"{name}: declares {governing}, but caching is not a call site's choice"
         )
+
+
+def test_the_cache_input_matcher_reads_a_name_it_is_given() -> None:
+    # Pre-flight the matcher, or a capability could declare a caching input and this gate would not see
+    # it. No capability declares one today, so the gate has nothing else to prove it works.
+    assert GOVERNS_A_CACHE.search("cache-key")
+    assert GOVERNS_A_CACHE.search("restore-cache")
+    assert not GOVERNS_A_CACHE.search("hook-stage")
+
+
+# An input is worth its place only where the caller knows something the callee cannot. A timeout is that
+# where the runtime is a function of the caller's tree, and nowhere else — every other knob on a
+# published surface is a promise with nothing behind it.
+TIMEOUT_INPUT = "timeout-minutes"
+
+MAY_TAKE_A_TIMEOUT = {
+    "python-ci": "runs the caller's own tasks and cannot know how long they take",
+    "prek-advisory": "reads the caller's whole tree and cannot know how large it is",
+}
+
+
+def test_a_timeout_input_exists_only_where_the_caller_knows_the_runtime() -> None:
+    # Set equality, not a subset: a capability joining the set fails, and one leaving it fails too, so
+    # the justification above and the tree cannot part company in either direction.
+    declaring = {
+        name
+        for name, doc in workflow_docs().items()
+        if is_capability(doc) and TIMEOUT_INPUT in declared_inputs(doc)
+    }
+    assert declaring == set(MAY_TAKE_A_TIMEOUT), (
+        f"capabilities declaring {TIMEOUT_INPUT} are {sorted(declaring)}; the ones a caller can time "
+        f"better than the callee are {sorted(MAY_TAKE_A_TIMEOUT)}. "
+        + "; ".join(f"{name} {why}" for name, why in sorted(MAY_TAKE_A_TIMEOUT.items()))
+        + ". A capability whose runtime is its own fixes its timeout in its jobs; adding or removing this "
+        "input changes the published surface, so the fixture moves in the same change"
+    )
+
+
+def test_every_job_of_a_capability_without_the_input_fixes_its_own_timeout() -> None:
+    # An input removed leaves nothing behind: the schema hook refuses a job with no timeout at all, and
+    # this says the same thing where the removal happened, so the two are not one hook away from silence.
+    unbounded: list[str] = []
+    for name, doc in workflow_docs().items():
+        if not is_capability(doc) or name in MAY_TAKE_A_TIMEOUT:
+            continue
+        for job_id, job in jobs(doc).items():
+            if TIMEOUT_INPUT not in job:
+                unbounded.append(f"{name}: job {job_id}")
+    assert unbounded == [], (
+        f"jobs with no {TIMEOUT_INPUT} of their own: {unbounded}. Their capability takes no timeout "
+        "input, so nothing else would bound them"
+    )
 
 
 def test_the_lockfile_check_precedes_every_stage_of_python_ci() -> None:
@@ -189,6 +252,16 @@ def test_no_step_in_the_release_path_writes_a_version() -> None:
     assert offending == [], (
         f"release.yml authors a change: {offending}. It tags what was already decided, and a version "
         "it wrote itself would be a version no review ever saw"
+    )
+
+
+def test_the_version_writing_markers_match_a_step_that_authors_one() -> None:
+    # Pre-flight the markers. No step in the release path writes a version, which is the point, so the
+    # gate above can never demonstrate that its tuple still matches anything.
+    assert any(marker in 'git commit -m "chore: release v1.2.3"' for marker in WRITES_A_VERSION)
+    assert any(marker in "uv run cz bump --yes" for marker in WRITES_A_VERSION)
+    assert not any(
+        marker in "gh release create v1.2.3 --notes-file notes.md" for marker in WRITES_A_VERSION
     )
 
 
@@ -296,8 +369,16 @@ def test_no_workflow_anywhere_triggers_on_pull_request_target() -> None:
 def test_both_grammar_jobs_pin_the_event_they_can_judge() -> None:
     # Pinning the event is also what puts `pull_request_target` structurally out of reach: neither job
     # runs under any event but the one it reads a title and a range from.
-    doc = load(WORKFLOW_DIR / "conventional-commits.yml")
-    for job_id, job in jobs(doc).items():
+    doc = load(CONVENTIONAL_COMMITS)
+    found = jobs(doc)
+    # Without this the loop below passes over an empty map, so a reader that stopped finding jobs would
+    # report green while neither grammar check pinned its event.
+    assert len(found) == 2, (
+        f"conventional-commits declares jobs {sorted(found)}; this gate judges the two grammar jobs. "
+        "Reading a different number means it is looking at the wrong workflow, or a job appeared that "
+        "nothing here holds to an event"
+    )
+    for job_id, job in found.items():
         condition = str(job.get("if", ""))
         assert "github.event_name == 'pull_request'" in condition, (
             f"conventional-commits job {job_id} runs under `if: {condition}`, which does not pin the "

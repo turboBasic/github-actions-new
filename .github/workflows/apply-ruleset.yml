@@ -1,4 +1,4 @@
-name: apply-ruleset
+name: 🌜 apply-ruleset
 
 # A ruleset write has no revert, so it runs by hand and dry by default: the difference always prints
 # before anything is written. The schedule only reads — the write step is reachable from

@@ -11,6 +11,7 @@ REPO = Path(__file__).resolve().parent.parent
 WORKFLOW_DIR = REPO / ".github" / "workflows"
 ACTION_DIR = REPO / "actions"
 RULESET_DIR = REPO / ".github" / "rulesets"
+CONVENTIONAL_COMMITS = WORKFLOW_DIR / "conventional-commits.yml"
 FIXTURE = Path(__file__).parent / "published_surface.toml"
 
 Doc = dict[Any, Any]
@@ -81,14 +82,26 @@ def is_capability(doc: Doc) -> bool:
     return "workflow_call" in triggers(doc)
 
 
+def is_call_only(doc: Doc) -> bool:
+    # A workflow reachable only by a call never has a run of its own, so its entry in the Actions
+    # sidebar is permanently empty. Read from the trigger set, so a workflow gaining a trigger stops
+    # being one of these without a list needing to be edited.
+    return set(triggers(doc)) == {"workflow_call"}
+
+
 def jobs(doc: Doc) -> Doc:
     return cast(Doc, doc.get("jobs", {}))
 
 
+def job_names(doc: Doc) -> dict[str, str]:
+    # Where a job declares no name GitHub falls back to its id, so the id is what a consumer would
+    # have to require. This is the one place that fallback is written.
+    return {str(job_id): str(job.get("name", job_id)) for job_id, job in jobs(doc).items()}
+
+
 def check_names(doc: Doc) -> list[str]:
-    # A consumer's required context is its own job id, then the called job's name. Where a job
-    # declares no name GitHub falls back to its id, so that is what a consumer would have to require.
-    return sorted(str(job.get("name", job_id)) for job_id, job in jobs(doc).items())
+    # A consumer's required context is its own job id, then the called job's name.
+    return sorted(job_names(doc).values())
 
 
 class ComposedContext(NamedTuple):
@@ -178,6 +191,16 @@ def composed_contexts() -> list[ComposedContext]:
                     )
                 )
     return out
+
+
+def allowed_commit_types() -> list[str]:
+    # The grammar both required checks judge against, declared once as that capability's own default.
+    # Read here rather than restated, so the notes gate and the grammar gate cannot disagree about
+    # which types exist.
+    call: Any = triggers(load(CONVENTIONAL_COMMITS)).get("workflow_call") or {}
+    inputs = cast(Doc, cast(Doc, call).get("inputs", {}))
+    default = cast(Doc, inputs.get("types", {})).get("default", "")
+    return [line.strip() for line in str(default).splitlines() if line.strip()]
 
 
 def declared_inputs(doc: Doc) -> set[str]:

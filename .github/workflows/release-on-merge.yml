@@ -1,4 +1,4 @@
-name: release-on-merge
+name: 🌜 release-on-merge
 
 # The dispatch entry point exists to dry-run: every refusal runs and the real notes render, and nothing
 # is created. It is the only safe way to exercise the release path, since a version tag cannot be
