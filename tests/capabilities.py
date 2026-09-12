@@ -85,10 +85,15 @@ def jobs(doc: Doc) -> Doc:
     return cast(Doc, doc.get("jobs", {}))
 
 
+def job_names(doc: Doc) -> dict[str, str]:
+    # Where a job declares no name GitHub falls back to its id, so the id is what a consumer would
+    # have to require. This is the one place that fallback is written.
+    return {str(job_id): str(job.get("name", job_id)) for job_id, job in jobs(doc).items()}
+
+
 def check_names(doc: Doc) -> list[str]:
-    # A consumer's required context is its own job id, then the called job's name. Where a job
-    # declares no name GitHub falls back to its id, so that is what a consumer would have to require.
-    return sorted(str(job.get("name", job_id)) for job_id, job in jobs(doc).items())
+    # A consumer's required context is its own job id, then the called job's name.
+    return sorted(job_names(doc).values())
 
 
 class ComposedContext(NamedTuple):
