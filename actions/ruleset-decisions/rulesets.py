@@ -12,6 +12,10 @@ WRITABLE_FIELDS = frozenset(
     {"name", "target", "enforcement", "conditions", "rules", "bypass_actors"}
 )
 
+# A branch ruleset gates what may reach a ref; a tag one protects the ref itself. Nothing else is
+# managed from the tree, so anything else is a mistake rather than a shape to support.
+TARGETS = frozenset({"branch", "tag"})
+
 NOTHING = "nothing"
 CREATE = "create"
 UPDATE = "update"
@@ -36,15 +40,24 @@ def shape_problem(committed: Doc) -> str | None:
     missing = sorted(WRITABLE_FIELDS - set(committed))
     if missing:
         return f"the committed ruleset omits {missing}, which a write requires"
-    if committed.get("target") != "branch":
-        return f"the committed ruleset's target is {committed.get('target')!r}; only 'branch' is in scope"
+    target = committed.get("target")
+    if target not in TARGETS:
+        return f"the committed ruleset's target is {target!r}; only {sorted(TARGETS)} are in scope"
     rules = cast(list[Doc], committed["rules"])
     rule_types = [str(rule.get("type")) for rule in rules]
+    if not rules:
+        return (
+            "the committed ruleset carries no rules, and a ruleset requiring nothing gates nothing"
+        )
+    # Only a branch ruleset gates on checks. A tag one protects the ref itself, so demanding a
+    # status-checks rule there would refuse the very shape that makes a release tag immutable.
+    if target != "branch":
+        return None
     checks_rules = [rule for rule in rules if rule.get("type") == "required_status_checks"]
     if len(checks_rules) != 1:
         return (
             f"the committed ruleset's rule types are {rule_types}, and exactly one must be "
-            "'required_status_checks' — a ruleset requiring nothing gates nothing"
+            "'required_status_checks' — a branch ruleset requiring nothing gates nothing"
         )
     contexts = cast(
         list[Doc], checks_rules[0].get("parameters", {}).get("required_status_checks", [])
