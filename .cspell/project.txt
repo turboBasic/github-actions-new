@@ -20,10 +20,15 @@ turboBasic
 zizmor
 
 # --- Publisher handles: GitHub actions and VS Code extensions ---
+arahata
 charliermarsh
 davidanson
+hverlin
 jdx
+mhutchie
+monokai
 tamasfe
+vivaxy
 zizmorcore
 
 # --- Library and API identifiers ---
