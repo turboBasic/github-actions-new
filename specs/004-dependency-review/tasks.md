@@ -260,7 +260,7 @@ reports on every pull request here and is absent from the required set.
   change, then revert. This is FR-022 exercised on the real files, over and above the pre-flights each
   gate carries in the suite.
 
-- [ ] T016 Work the "Online" section of [quickstart.md](quickstart.md) against a real repository: the
+- [X] T016 Work the "Online" section of [quickstart.md](quickstart.md) against a real repository: the
   failing case (SC-003), the passing cases, the floor at `fail-on-severity: high` (Scenario 1.4), the
   adoption cost with nothing granted (SC-002), the dependency-graph-off case (SC-007), and this
   repository as its own consumer (SC-008). Requires GitHub network access and is not part of
