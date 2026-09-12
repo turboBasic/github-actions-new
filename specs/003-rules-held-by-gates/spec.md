@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Draft
+**Status**: Merged 2026-09-12, in no release yet
 
 **Input**: User description: "Every rule this repository states about itself is held by a test that reads the tree and needs no network. Today several are stated and held by nothing, so prose is the only thing standing between a rule and its quiet reversal."
 
