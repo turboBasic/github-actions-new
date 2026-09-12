@@ -61,10 +61,28 @@ def test_shape_problem_names_a_missing_field() -> None:
     assert "bypass_actors" in message
 
 
-def test_shape_problem_names_a_target_that_is_not_branch() -> None:
-    message = shape_problem({**COMMITTED, "target": "tag"})
+def test_shape_problem_names_a_target_it_does_not_manage() -> None:
+    message = shape_problem({**COMMITTED, "target": "push"})
     assert message is not None
-    assert "'tag'" in message
+    assert "'push'" in message
+
+
+def test_a_tag_ruleset_needs_no_required_status_checks_rule() -> None:
+    # A tag ruleset protects the ref itself. Demanding a checks rule would refuse the only shape that
+    # makes a released version immutable.
+    tag_ruleset: Doc = {
+        **COMMITTED,
+        "target": "tag",
+        "rules": [{"type": "deletion"}, {"type": "update"}],
+    }
+    assert shape_problem(tag_ruleset) is None
+
+
+def test_shape_problem_refuses_a_ruleset_carrying_no_rules_whatever_its_target() -> None:
+    for target in ("branch", "tag"):
+        message = shape_problem({**COMMITTED, "target": target, "rules": []})
+        assert message is not None, target
+        assert "gates nothing" in message
 
 
 def test_shape_problem_names_the_absent_required_status_checks_rule() -> None:
@@ -89,10 +107,10 @@ def test_shape_problem_is_none_for_a_well_formed_ruleset() -> None:
 
 
 def test_a_malformed_committed_file_refuses_before_any_live_ruleset_is_read() -> None:
-    bad = {**COMMITTED, "target": "tag"}
+    bad = {**COMMITTED, "target": "push"}
     verdict = decide(bad, [])
     assert verdict.verdict == REFUSE
-    assert "tag" in verdict.message
+    assert "push" in verdict.message
 
 
 def test_no_matching_name_creates() -> None:
