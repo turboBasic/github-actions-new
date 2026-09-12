@@ -34,8 +34,10 @@ stdlib
 
 # --- Config keys ---
 addopts
-# git-cliff renders its notes with a Tera template
+# git-cliff renders its notes with a Tera template, shaped by postprocessors
 endfor
+postprocessors
+Tera
 conftest
 testpaths
 
