@@ -1,6 +1,12 @@
 # What a release's notes say, and where they come from: the commit types in the range, never a label
 # on a pull request. A label is applied after the fact by whoever is looking, and two people label
 # differently; a commit type was chosen by the person who made the change and is already gated.
+#
+# git-cliff publishes no schema for this file, so `tests/test_release_notes.py` is the whole of what
+# holds it: every type the grammar admits reaches a section or a deliberate skip, the six sections keep
+# their titles and their order, and the tag pattern matches an exact version and never a moving ref.
+# The two rules about a rendered item are asserted by rendering into a throwaway repository, because a
+# pattern that has stopped matching leaves this file valid and the body wrong.
 
 [changelog]
 header = ""
