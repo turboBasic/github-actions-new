@@ -159,7 +159,23 @@ def test_a_real_difference_updates_with_the_difference_rendered_both_sides() -> 
 
 def test_render_difference_names_both_sides_for_every_differing_field() -> None:
     difference = render_difference(normalize(COMMITTED), normalize(_detail(target="tag")))
-    assert "target: committed='branch' live='tag'" in difference
+    assert '-  "target": "tag"' in difference
+    assert '+  "target": "branch"' in difference
+
+
+def test_render_difference_is_empty_when_the_two_documents_agree() -> None:
+    same = normalize(_detail())
+    assert render_difference(same, same) == ""
+
+
+def test_render_difference_keeps_a_nested_change_to_the_line_it_happened_on() -> None:
+    # The failure this replaces: one changed context printed both `rules` arrays on a single line,
+    # leaving the reader to diff them by eye before an irreversible write.
+    live = normalize(_detail())
+    committed = normalize(COMMITTED)
+    difference = render_difference(committed, live)
+    changed = [line for line in difference.splitlines() if line[:1] in {"-", "+"}]
+    assert all(len(line) < 200 for line in changed), difference
 
 
 def test_normalize_drops_everything_but_the_six_writable_fields() -> None:
