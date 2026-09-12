@@ -34,7 +34,8 @@ One command; it wires up the `pre-commit` and `commit-msg` hooks together.
 ## The loop
 
 ```sh
-mise run ci      # lint, schema validation, typecheck, test — exactly what CI runs
+mise run ci             # lint, schema validation, typecheck, test — exactly what CI runs
+mise run release-notes  # what a release would publish, rendered here, creating nothing
 ```
 
 ## Specs
