@@ -41,7 +41,7 @@ The template's optional-tests note does not apply.
 
 **Purpose**: establish the baseline every later task is measured against.
 
-- [ ] T001 Record the baseline in `tmp/`: `mise run ci` green, and the current test count from
+- [X] T001 Record the baseline in `tmp/`: `mise run ci` green, and the current test count from
   `mise run test`, so every later task can assert it added gates without removing any
 
 **Already applied during planning** (present in the working tree, uncommitted): `Tera` and
@@ -56,9 +56,9 @@ first `cliff.toml` comment lands.
 
 **⚠️ CRITICAL**: T002 blocks US4; T003 blocks US4 and US5.
 
-- [ ] T002 Add a job-name accessor to `tests/capabilities.py` returning every job's name with the id
+- [X] T002 Add a job-name accessor to `tests/capabilities.py` returning every job's name with the id
   fallback, reusing the fallback rule `check_names()` already encodes rather than restating it
-- [ ] T003 Add a trigger-kind accessor to `tests/capabilities.py` answering whether `workflow_call` is a
+- [X] T003 Add a trigger-kind accessor to `tests/capabilities.py` answering whether `workflow_call` is a
   document's only trigger, built on the existing `triggers()` reader
 
 **Checkpoint**: `mise run ci` green with two unused accessors. pyright strict covers both.
@@ -78,41 +78,43 @@ fails; then render a range containing a ref pin and an unnumbered subject and re
 Written first, and expected **green** immediately — the rules already hold and only lacked a gate. A red
 result here means the gate reads the wrong thing.
 
-- [ ] T004 [US1] Create `tests/test_release_notes.py` with FR-001: every one of the twelve types the
+- [X] T004 [US1] Create `tests/test_release_notes.py` with FR-001: every one of the twelve types the
   grammar admits resolves through `cliff.toml`'s `commit_parsers` to exactly one destination, a group or
   a skip. Read the type set via US2's accessor if T018 has landed, otherwise from the workflow default.
   Assert *exactly one*, so a pattern Python cannot read fails rather than passing (research R14)
-- [ ] T005 [US1] Add FR-003 to `tests/test_release_notes.py`: `tag_pattern` matches `v1.2.3` and does
+- [X] T005 [US1] Add FR-003 to `tests/test_release_notes.py`: `tag_pattern` matches `v1.2.3` and does
   not match `v1`, `v1.2`, or a suffixed tag. Both a positive and a negative assertion, so `.*` and `^$`
   both fail
 
 ### Gates that fail until the tree is fixed
 
-Written before their fix, and expected **red**. Each is paired with the commit that makes it pass.
+Written before their fix, and expected **red**. **A gate and the tree change that turns it green are
+one commit**, not two — the one-green-commit-per-task convention above overrides the task boundary here,
+so T006+T007 landed together and T008+T009+T010 landed together.
 
-- [ ] T006 [US1] Add FR-002 to `tests/test_release_notes.py`: the six groups are exactly
+- [X] T006 [US1] Add FR-002 to `tests/test_release_notes.py`: the six groups are exactly
   `Added, Fixed, Performance, Changed, Reverted, Documentation` in that order, each carrying a unique
   `<!--N-->` prefix, and there is no seventh group — a breaking change is marked inline on its item, not
   given a section. Write the six titles and numbers out literally; deriving them from the parser order
   would hold nothing (research R1). Fails now — no group has a prefix
-- [ ] T007 [US1] Add the ordering prefixes to `cliff.toml` group names and the stripping postprocessor
+- [X] T007 [US1] Add the ordering prefixes to `cliff.toml` group names and the stripping postprocessor
   `{ pattern = '<!--[0-9]+-->', replace = "" }`, numbered in the declared order —
   `1 Added, 2 Fixed, 3 Performance, 4 Changed, 5 Reverted, 6 Documentation` (research R1). T006 goes
   green. **The rendered order changes**, from the alphabetical sequence Tera was producing to the one the
   configuration has always declared; that is the intent, not a side effect
-- [ ] T008 [US1] Add FR-004 and FR-005 to `tests/test_release_notes.py` as rendering assertions: plant a
+- [X] T008 [US1] Add FR-004 and FR-005 to `tests/test_release_notes.py` as rendering assertions: plant a
   git repository in `tmp_path` with a numbered subject, an unnumbered subject, a subject carrying `@v5`,
   and a subject carrying an email address; run `git-cliff --config <repo cliff.toml> --unreleased` with
   `cwd` set to the planted repository. Guard on `shutil.which("git-cliff")` with a message naming
   `mise run test`. Never `mise exec --cd`, which renders this repository instead (research R4). Fails now
   on three of the four subjects
-- [ ] T009 [US1] Add the `@`-mention postprocessor to `cliff.toml`:
+- [X] T009 [US1] Add the `@`-mention postprocessor to `cliff.toml`:
   `{ pattern = '(?m)(^|[\s(\[])@([A-Za-z0-9][A-Za-z0-9-]*)', replace = '${1}`@${2}`' }`. The leading
   anchor is what leaves an address alone, and T008's address subject is what holds it there
-- [ ] T010 [US1] Add the reference fallback to `cliff.toml`'s body template:
+- [X] T010 [US1] Add the reference fallback to `cliff.toml`'s body template:
   `{% if commit.message is not matching("\(#[0-9]+\)") %} ({{ commit.id | truncate(length=7, end="") }}){% endif %}`.
   T008 goes fully green — an unnumbered item gains its short id and a numbered one gains nothing
-- [ ] T011 [US1] Update `cliff.toml`'s header comment to state what now holds it: the ordering numbers as
+- [X] T011 [US1] Update `cliff.toml`'s header comment to state what now holds it: the ordering numbers as
   the only statement of position, and that FR-004 and FR-005 are held by rendering because a rotted
   pattern leaves valid TOML. State the rule, not the incident
 
